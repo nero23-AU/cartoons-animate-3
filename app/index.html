@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cartoons Animate 3</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a2a33">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="Crie animações 2D com bonecos articulados direto no navegador, no PC ou no celular.">
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<script src="lib/jszip.min.js"></script>
+<script src="lib/mp4-muxer.js"></script>
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="scene.js"></script>
+<script src="audio.js"></script>
+<script src="paint.js"></script>
+<script src="tools.js"></script>
+<script src="webads.js"></script>
+<script src="monet.js"></script>
+<script src="app.js"></script>
+<div id="rotate"><div style="font-size:54px">📱↻</div><div>Gire o celular para a horizontal</div><button id="fs-btn">Tela cheia na horizontal</button></div>
+<script>document.getElementById('fs-btn').onclick = async () => { try { await document.documentElement.requestFullscreen(); await screen.orientation.lock('landscape'); } catch (e) {} };</script>
+<script>if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
