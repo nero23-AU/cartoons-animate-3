@@ -14,7 +14,7 @@ const CONFIG = {
   removeAdsPrice: 'US$ 4,99',
 
   // Página de política de privacidade (obrigatória para anúncios). Fica na landing page.
-  privacyUrl: 'https://nero23-au.github.io/cartoons-animate-3/privacidade.html',       // ex.: https://seunome.github.io/cartoons-animate-3/privacidade.html
+  privacyUrl: 'https://vinskapps.online/privacidade.html',       // ex.: https://seunome.github.io/cartoons-animate-3/privacidade.html
 
   // Anúncios da versão web: '' = sem anúncios, 'adsterra' ou 'adsense' (veja SETUP.md).
   adProvider: 'adsterra',
