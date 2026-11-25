@@ -107,7 +107,8 @@ function projectThumb(p, w, h2) {
     ctx.save(); ctx.translate((cw - W * k) / 2, (ch - H * k) / 2); ctx.scale(k, k);
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     const f = clone(p.frames[0]); Scene.resolve(p, f);
-    Scene.drawBg(ctx, p); Scene.drawFrame(ctx, p, f);
+    ctx.fillStyle = css(p.bg); ctx.fillRect(0, 0, W, H); Scene.applyCam(ctx, Scene.camOf(p.frames[0]));
+    Scene.drawBg(ctx, p, p.frames[0]); Scene.drawFrame(ctx, p, f);
     ctx.restore();
   });
   s.el.style.width = w + 'px'; s.el.style.height = h2 + 'px';
@@ -123,7 +124,7 @@ async function showHome() {
   projects.forEach((r, idx) => {
     if (idx === 2) { const ad = Monet.nativeCard('home_projects', 300, 250); if (ad) grid.append(ad); } // card discreto, como um projeto
     const d = new Date(r.time);
-    const empty = !r.p.inst.length && !r.p.bgImg; // projeto sem nada: miniatura com aviso em vez de um bloco branco
+    const empty = !r.p.inst.length && !r.p.bgImg && !r.p.frames.some(x => x.bgImg); // projeto sem nada: miniatura com aviso em vez de um bloco branco
     grid.append(h('div', { cls: 'proj-card', onclick: () => { Analytics.track('project_open', { frames: r.p.frames.length }); new Editor(r.p); } },
       empty ? h('div', { cls: 'proj-thumb empty' }, h('div', { cls: 'ic' }, '🎬'), 'Sem itens ainda') : h('div', { cls: 'proj-thumb' }, projectThumb(r.p, 320, 180)),
       h('div', { cls: 'proj-info' },
@@ -157,6 +158,7 @@ async function showHome() {
         const p = newProject(); p.name = 'Animação ' + (projects.length + 1); Analytics.track('project_new'); new Editor(p);
       }, true),
       big('🧩', 'CONSTRUTOR\nDE ITENS', 'var(--cyan)', () => showItems()),
+      big('📖', 'TUTORIAL', 'var(--teal)', () => showTutorial()),
       big('💾', 'BACKUP', 'var(--play)', () => showBackup()),
       big('🧹', 'ARMAZE-\nNAMENTO', 'var(--ink-3)', () => showStorage()),
       Auth.enabled() ? big(Auth.user() ? '☁' : '👤', 'CONTA', 'var(--select)', () => showAccount()) : null,
@@ -169,12 +171,18 @@ const Library = {
   query(text, folder) {
     const all = [...Builtins.items.map(t => ({ t, builtin: true, tags: [], fav: false, folder: t.cat })), ...Store.items];
     const words = norm(text).split(/\s+/).filter(Boolean);
-    return all.filter(r => {
+    const q = norm(text).trim();
+    const out = all.filter(r => {
       if (folder === '★' && !r.fav) return false;
       if (folder && folder !== '★' && (r.folder || Cat.CUSTOM) !== folder) return false;
-      const hay = norm([r.t.name, r.folder, ...(r.tags || [])].join(' '));
+      // nome original e traduzido, pasta e etiquetas; sem diferenciar maiúsculas/minúsculas nem acentos
+      const hay = norm([r.t.name, T(r.t.name), r.folder, T(r.folder || ''), ...(r.tags || [])].join(' '));
       return words.every(w => hay.includes(w.replace(/^#/, '')));
     });
+    if (!q) return out;
+    // quem começa com o texto digitado aparece primeiro
+    const rank = r => { const n = norm(r.t.name), t2 = norm(T(r.t.name)); return n.startsWith(q) || t2.startsWith(q) ? 0 : n.split(/\s+/).some(x => x.startsWith(q)) || t2.split(/\s+/).some(x => x.startsWith(q)) ? 1 : 2; };
+    return out.map(r => [rank(r), r]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
   },
   folders() {
     const counts = new Map();
@@ -183,6 +191,42 @@ const Library = {
     Store.items.forEach(r => add(r.folder || Cat.CUSTOM));
     const fav = Store.items.filter(r => r.fav).length;
     return [['★', `★ Favoritos`, fav], ...[...counts].map(([k, n]) => [k, k, n])];
+  },
+  clip: null, // { t, name, cut } — copiar/recortar entre pastas
+  /** Nome livre para uma cópia (não sobrescreve item existente). */
+  freeName(base) { let n = base, k = 2; while (Store.items.some(r => r.t.name === n)) n = `${base} (${k++})`; return n; },
+  /** Escolhe a pasta de destino (as categorias e pastas existentes, ou uma nova). */
+  pickFolder(title, done) {
+    const opts = ['＋ Nova pasta…', ...[...new Set([...CATS, ...Store.folders()])]];
+    choose(title, opts.map(o => o === opts[0] ? o : '📁 ' + T(o)), j => {
+      if (j === 0) askText('Nome da nova pasta', '', n => n.trim() && done(n.trim().slice(0, 60)));
+      else done(opts[j]);
+    });
+  },
+  async paste(folder, done) {
+    const c = Library.clip; if (!c) return toast('Copie ou recorte um item primeiro');
+    const go = async f => {
+      if (c.cut && Store.items.some(r => r.t.name === c.name)) { await Store.updateMeta(c.name, { folder: f }); Library.clip = null; toast('Item movido ✓'); }
+      else { const t = clone(c.t); t.name = Library.freeName(c.t.name); await Store.saveItem(t, null, { folder: f }); toast('Item colado ✓'); }
+      done && done();
+    };
+    if (folder && folder !== '★') go(folder); else Library.pickFolder('Colar em qual pasta?', go);
+  },
+  /** Menu ⋮ de um item: editar, copiar, recortar, colar, mover, favoritar, excluir. */
+  itemMenu(r, folder, done, onEdit) {
+    const own = !r.builtin;
+    const opts = [], acts = [];
+    const add = (l, f) => { opts.push(l); acts.push(f); };
+    if (onEdit && own) add('✏ Editar', () => onEdit(r));
+    add('⧉ Copiar', () => { Library.clip = { t: clone(r.t), name: r.t.name, cut: false }; toast('Item copiado: escolha a pasta e toque em Colar'); });
+    if (own) add('✂ Recortar', () => { Library.clip = { t: clone(r.t), name: r.t.name, cut: true }; toast('Item recortado: escolha a pasta e toque em Colar'); });
+    if (Library.clip) add('📋 Colar aqui', () => Library.paste(folder, done));
+    if (own) add('📁 Mover para pasta…', () => Library.pickFolder('Mover para pasta', f => Store.updateMeta(r.t.name, { folder: f }).then(done)));
+    if (own) add(r.fav ? '☆ Tirar dos favoritos' : '★ Favoritar', () => Store.updateMeta(r.t.name, { fav: !r.fav }).then(done));
+    if (own) add('🏷 Etiquetas…', () => askText('Etiquetas (separadas por vírgula)', (r.tags || []).join(', '),
+      v => Store.updateMeta(r.t.name, { tags: v.split(',').map(x => x.trim()).filter(Boolean) }).then(done), 'allowEmpty'));
+    if (own) add('🗑 Excluir', () => modal(`Excluir "${r.t.name}"?`, h('div', {}, 'Isso não pode ser desfeito.'), [['Cancelar', null], ['Excluir', async () => { await Store.deleteItem(r.t.name); done && done(); }]]));
+    choose(T(r.t.name), opts, i => acts[i]());
   },
   /** Menu de organização de um item do usuário. */
   organize(r, done) {
@@ -213,9 +257,8 @@ function showItems(back = showHome) {
   const list = h('div', { cls: 'scroll', style: { flex: '1' } });
   const chips = h('div', { cls: 'row', style: { gap: '6px', flexWrap: 'wrap', padding: '8px 0' } });
   const fill = () => {
-    chips.replaceChildren(...[['', 'Todos', null], ...Library.folders()].map(([k, l, n]) => h('div', { cls: 'btn', style: {
-      padding: '5px 10px', fontSize: '13px', fontWeight: 'normal', background: folder === k ? 'var(--active)' : '#3a3a44' }, onclick: () => { folder = k; fill(); } },
-      n == null ? l : `${l} (${n})`)));
+    chips.replaceChildren(...[['', 'Todos', null], ...Library.folders()].map(([k, l, n]) => h('div', { cls: 'btn chip' + (folder === k ? ' on' : ''), onclick: () => { folder = k; fill(); } },
+      n == null ? l : `${T(l)} (${n})`)), Library.clip ? h('div', { cls: 'btn chip paste', onclick: () => Library.paste(folder, fill) }, '📋 Colar aqui') : null);
     list.replaceChildren();
     const rows = Library.query(text, folder).filter(r => !r.builtin);
     if (!rows.length) list.append(h('div', { style: { color: 'var(--grey)', fontSize: '16px', padding: '30px 10px' } },
@@ -230,12 +273,7 @@ function showItems(back = showHome) {
         h('div', { cls: 'dots', onclick: e => { e.stopPropagation(); itemMenu(r); } }, '⋮')));
     });
   };
-  const itemMenu = r => choose(r.t.name, ['Editar', 'Organizar (favorito, pasta, etiquetas)', 'Duplicar', 'Excluir'], async i => {
-    if (i === 0) openBuilder(clone(r.t), false, () => showItems(back));
-    if (i === 1) Library.organize(r, fill);
-    if (i === 2) { const c = clone(r.t); c.name = r.t.name + '_copia'; await Store.saveItem(c, null, { folder: r.folder, tags: r.tags }); fill(); }
-    if (i === 3) modal(`Excluir "${r.t.name}"?`, h('div'), [['Cancelar', null], ['Excluir', async () => { await Store.deleteItem(r.t.name); fill(); }]]);
-  });
+  const itemMenu = r => Library.itemMenu(r, folder, fill, x => openBuilder(clone(x.t), false, () => showItems(back)));
   const doImport = async f => {
     const files = await pickFiles({ accept: '.atp,.ati', multiple: true, folder: f });
     if (!files.length) return;
@@ -286,7 +324,7 @@ class Editor {
   }
   /** Atalhos de teclado (computador). */
   onKey(e) {
-    if (Editor.current !== this || document.querySelector('#modal-root .modal-bg') || document.querySelector('.paint-root')) return;
+    if (Editor.current !== this || document.querySelector('#modal-root .modal-bg') || document.querySelector('.paint-root') || this.player) return;
     const t = e.target, tag = (t.tagName || '').toLowerCase();
     if (tag === 'textarea' || t.isContentEditable || (tag === 'input' && !/^(range|checkbox|radio|button|color)$/.test(t.type))) return;
     if (tag === 'button' || tag === 'input') t.blur(); // um botão com foco não "rouba" Espaço/Enter
@@ -334,13 +372,36 @@ class Editor {
     add('redo', tool('↷', 'REFAZER', 'var(--cyan)', () => this.redo()));
     this.panel = h('div', { cls: 'panel col scroll', style: { display: 'none' } });
     this.saveLabel = h('div', { cls: 'save-label' });
-    const stageWrap = h('div', { cls: 'stage-wrap' }, this.stage.s.el, this.saveLabel);
+    // botão grande para voltar ao menu do app
+    const exitBtn = h('button', { cls: 'exit-btn', title: T('Sair para o menu'), onclick: () => this.exit() }, '✖ ', 'SAIR');
+    // câmera: liga o modo de enquadrar (quadro azul que move e dá zoom)
+    this.camBtn = h('button', { cls: 'cam-btn', title: T('Câmera: enquadramento'), onclick: () => this.toggleCamera() }, '🎥');
+    this.camResetBtn = h('button', { cls: 'cam-reset', style: { display: 'none' }, onclick: () => this.resetCamera() }, '⟲ ', 'Palco inteiro');
+    const stageWrap = h('div', { cls: 'stage-wrap' }, this.stage.s.el, this.saveLabel, exitBtn, this.camBtn, this.camResetBtn);
     this.stage.s.el.style.flex = '1';
-    const right = h('div', { cls: 'col', style: { flex: '1', minWidth: '0' } }, stageWrap, this.timeline.s.el);
+    const tl = this.timeline;
+    this.cutBtn = h('button', { cls: 'tl-btn', title: T('Tesoura: toque no áudio onde quer cortar'), onclick: () => {
+      tl.cutMode = !tl.cutMode; this.cutBtn.classList.toggle('on', tl.cutMode);
+      if (tl.cutMode) toast('Tesoura ligada: toque no bloco de áudio exatamente onde quer cortar');
+    } }, '✂');
+    // barra de rolagem: arrasta do começo ao fim da timeline (quadros e áudio)
+    this.tlScroll = h('input', { type: 'range', cls: 'tl-scroll', min: 0, max: 0, step: 1, value: 0, oninput: e => { tl.scroll = +e.target.value; tl.clamp(); tl.s.invalidate(); } });
+    tl.onDraw = () => { const max = Math.max(0, Math.round(tl.contentWidth() - tl.s.w)); this.tlScroll.max = max; this.tlScroll.value = Math.round(tl.scroll); this.tlScroll.disabled = !max; };
+    const tlBar = h('div', { cls: 'tl-bar' }, this.cutBtn, this.tlScroll);
+    const right = h('div', { cls: 'col', style: { flex: '1', minWidth: '0' } }, stageWrap, this.timeline.s.el, tlBar);
     this.timeline.s.el.style.height = '116px'; this.timeline.s.el.style.flex = 'none'; this.timeline.s.el.classList.add('timeline-wrap');
     $app().replaceChildren(bar, this.panel, right);
     this.updateUndoButtons();
   }
+  toggleCamera(force) {
+    this.camMode = force ?? !this.camMode;
+    this.camBtn.classList.toggle('on', this.camMode);
+    if (this.camMode) { if (this.stage.playing) this.togglePlay(); this.stage.selected = -1; toast('Câmera: arraste o quadro azul para mover e a alça do canto para dar zoom (vale para este quadro e os próximos novos)', 4500); }
+    this.camResetBtn.style.display = this.camMode ? 'block' : 'none';
+    this.stage.s.invalidate();
+  }
+  resetCamera() { this.beforeChange(true); delete this.project.frames[this.frame].cam; this.changed(); toast('Câmera mostrando o palco inteiro'); }
+  exit() { if (this.player) this.player.close(); this.saveNow().then(async () => { await showHome(); Monet.interstitial('exit_project'); }); }
   // ----- desfazer / refazer (com limite de memória para projetos longos) -----
   /**
    * Guarda o estado para desfazer. frameOnly = só o quadro atual mudou (posar, mover, girar):
@@ -416,6 +477,10 @@ class Editor {
   }
   onPlayTime(t, fi) { this.timeline.playT = t; if (this.timeline.playFrame !== fi) this.timeline.playFrame = fi; this.timeline.s.invalidate(); }
   togglePlay() {
+    if (this.player) return this.player.toggle();
+    this.closePanel(); this.saveNow(); new Player(this); return;
+  }
+  togglePlayInline() {
     const [g, l] = this.playBtn.children;
     if (this.stage.playing) {
       this.stage.stop(); AudioEngine.stop(); this.timeline.playFrame = -1; this.timeline.playT = -1;
@@ -440,7 +505,8 @@ class Editor {
   /** Fundo: cor sólida ou imagem da galeria / dos arquivos do computador. */
   backgroundMenu() {
     const p = this.project, opts = ['🎨 Cor sólida', '🖼 Imagem da galeria ou do computador…'];
-    if (p.bgImg) opts.push('↔ Ajuste da imagem: ' + ({ cover: 'preencher', contain: 'inteira', stretch: 'esticar' }[p.bgFit || 'cover']), '✖ Remover imagem de fundo');
+    const cur = Scene.bgOf(p, p.frames[this.frame]);
+    if (cur) opts.push('↔ Ajuste da imagem: ' + ({ cover: 'preencher', contain: 'inteira', stretch: 'esticar' }[p.bgFit || 'cover']), '✖ Remover imagem de fundo');
     choose('Plano de fundo', opts, async i => {
       if (i === 0) return pickColor('Cor do fundo', c => { this.beforeChange(); p.bg = c; this.changed(); });
       if (i === 1) {
@@ -448,14 +514,22 @@ class Editor {
         try {
           const blob = await fitImageBlob(f, 2560);
           const name = await Images.save(blob);
-          this.beforeChange(); p.bgImg = name; p.bgFit = p.bgFit || 'cover'; this.changed();
+          // vale deste quadro em diante (e os quadros novos copiam do anterior)
+          this.beforeChange(); this.setBg(this.frame, p.frames.length, name); p.bgFit = p.bgFit || 'cover'; this.changed();
           Analytics.track('bg_image'); toast('Imagem de fundo aplicada');
         } catch (e) { toast('Não consegui abrir essa imagem'); }
       }
       if (i === 2) { const order = ['cover', 'contain', 'stretch']; this.beforeChange(); p.bgFit = order[(order.indexOf(p.bgFit || 'cover') + 1) % 3]; this.changed(); }
-      if (i === 3) { this.beforeChange(); delete p.bgImg; this.changed(); }
+      if (i === 3) choose('Remover a imagem de fundo de…', ['Só deste quadro', 'Deste quadro em diante', 'Todos os quadros'], j => {
+        this.beforeChange();
+        if (j === 0) this.setBg(this.frame, this.frame + 1, null);
+        else if (j === 1) this.setBg(this.frame, p.frames.length, null);
+        else { this.setBg(0, p.frames.length, null); delete p.bgImg; }
+        this.changed(); toast('Imagem de fundo removida');
+      });
     });
   }
+  setBg(from, to, name) { for (let k = from; k < to; k++) this.project.frames[k].bgImg = name; }
   /** Efeito de transição entre este quadro e o próximo (como em editores de vídeo). */
   frameEffect() {
     const f = this.project.frames[this.frame];
@@ -543,9 +617,9 @@ class Editor {
     if (n) { this.changed(); Analytics.track('audio_add', { n }); toast(`${n} áudio(s) adicionado(s) a partir do quadro ${this.frame + 1}. Arraste o clipe para ajustar.`); }
   }
   /** Divide o bloco de áudio em dois no começo do quadro atual (ou no cursor de reprodução). */
-  splitClip(c) {
+  splitClip(c, at) {
     c = c || this.timeline.selClip; if (!c) return toast('Toque num bloco de áudio para selecioná-lo');
-    const t = Scene.frameStart(this.project, this.frame), rate = c.rate || 1;
+    const t = Math.round(at ?? Scene.frameStart(this.project, this.frame)), rate = c.rate || 1;
     if (t <= c.start + 20 || t >= c.start + c.dur - 20) return toast('Selecione um quadro que fique no meio deste áudio para cortar ali');
     this.beforeChange();
     const a = t - c.start;
@@ -585,7 +659,7 @@ class Editor {
     const p = this.panel; p.replaceChildren();
     p.style.display = 'flex';
     p.style.width = (kind === 'menu' || kind === 'insert') ? '240px' : '110px';
-    p.style.background = kind === 'insert' ? 'var(--cream)' : 'var(--panel)';
+    p.style.background = 'var(--panel)';
     const pr = () => this.project, fr = () => this.project.frames[this.frame];
     if (kind === 'frame') p.append(
       tool('＋', 'ADICIONAR', '#fff', () => this.addFrame()),
@@ -616,7 +690,8 @@ class Editor {
       item('🎵', 'ADICIONAR ÁUDIO', () => this.addAudio());
       item('🖼', 'PLANO DE FUNDO', () => this.backgroundMenu());
       item('🧩', 'CRIAR ITENS', () => { this.saveNow(); const ed = this; showItems(() => { ed.buildUI(); Editor.current = ed; ed.refresh(); }); });
-      item('✖', 'SAIR', () => this.saveNow().then(async () => { await showHome(); Monet.interstitial('exit_project'); }));
+      item('📖', 'TUTORIAL', () => showTutorial());
+      item('✖', 'SAIR', () => this.exit());
       p.append(h('div', { style: { color: '#9a9aa4', fontSize: '12px', padding: '10px 18px' } }, 'Tudo é salvo automaticamente.'));
       if (matchMedia('(pointer: fine)').matches) p.append(h('div', { style: { color: '#9a9aa4', fontSize: '12px', padding: '0 18px 12px', lineHeight: '1.7' } },
         h('b', {}, 'Atalhos do teclado'), h('br'), 'Espaço: jogar/parar · ← →: quadro anterior/próximo', h('br'), 'N ou Enter: novo quadro · Delete: apagar item ou quadro', h('br'), 'Ctrl+Z / Ctrl+Y: desfazer/refazer · Ctrl+C / Ctrl+V: copiar/colar quadro', h('br'), 'I: inserir · S: cortar o áudio selecionado · Esc: fechar painel', h('br'), 'Áudio: arraste as pontas para cortar · clique duplo para esticar · Roda do mouse: zoom'));
@@ -634,11 +709,12 @@ class Editor {
         return;
       }
       const rows = Library.query(this.insertText, folder || '');
-      if (!rows.length) list.append(h('div', { style: { color: 'var(--folder)', padding: '14px' } }, 'Nada encontrado.'));
+      if (!rows.length) list.append(h('div', { style: { color: 'var(--ink-2)', padding: '14px' } }, 'Nada encontrado.'));
+      if (Library.clip && folder != null) list.append(h('div', { cls: 'folder', onclick: () => Library.paste(folder, fillList) }, '📋  ' + T('Colar aqui') + ': ' + Library.clip.name));
       for (const r of rows) list.append(h('div', { cls: 'lib-row', onclick: () => this.insert(r.t) },
-        thumb(r.t, 56, 56), h('div', { style: { flex: 1 } }, (r.fav ? '★ ' : '') + r.t.name,
+        thumb(r.t, 56, 56), h('div', { style: { flex: 1, minWidth: 0 } }, (r.fav ? '★ ' : '') + r.t.name,
           (r.tags || []).length ? h('div', { style: { fontSize: '11px', opacity: 0.7 } }, r.tags.map(x => '#' + x).join(' ')) : null),
-        r.builtin ? null : h('div', { style: { padding: '0 6px', fontSize: '20px' }, onclick: e => { e.stopPropagation(); Library.organize(r, fillList); } }, r.fav ? '★' : '☆')));
+        h('div', { cls: 'dots', title: 'Opções', onclick: e => { e.stopPropagation(); Library.itemMenu(r, folder, fillList); } }, '⋮')));
     };
     p.append(h('div', { cls: 'lib-head', onclick: () => { if (folder == null) this.closePanel(); else { this.insertFolder = null; this.togglePanel('insert'); } } },
       folder == null ? '⌃  Voltar' : '‹  ' + (folder === '★' ? 'Favoritos' : folder)),
@@ -646,6 +722,98 @@ class Editor {
     fillList();
   }
 }
+
+
+// ---------- player: janela de reprodução com pausa e barra de tempo ----------
+class Player {
+  constructor(ed) {
+    this.ed = ed; this.project = ed.project; this.total = Math.max(1, totalMs(this.project));
+    this.t = Scene.frameStart(this.project, ed.frame); if (this.t >= this.total - 1) this.t = 0;
+    this.playing = false; this.loop = true;
+    this.surf = new Surface((ctx, w, hh) => this.draw(ctx, w, hh));
+    this.btn = h('button', { cls: 'pl-btn main', onclick: () => this.toggle() }, '▶');
+    this.bar = h('input', { type: 'range', cls: 'pl-bar', min: 0, max: Math.round(this.total), step: 1, value: Math.round(this.t),
+      oninput: e => this.seek(+e.target.value), onpointerdown: () => { this.wasPlaying = this.playing; this.pause(); }, onpointerup: () => { if (this.wasPlaying) this.play(); } });
+    this.time = h('span', { cls: 'pl-time' });
+    this.loopBtn = h('button', { cls: 'pl-btn on', title: T('Repetir'), onclick: () => { this.loop = !this.loop; this.loopBtn.classList.toggle('on', this.loop); } }, '🔁');
+    this.root = h('div', { cls: 'player' },
+      h('div', { cls: 'pl-top' }, h('b', {}, this.project.name || 'Sem nome'), h('div', { style: { flex: 1 } }),
+        h('button', { cls: 'pl-close', onclick: () => this.close() }, '✖ ', 'Fechar')),
+      h('div', { cls: 'pl-view' }, this.surf.el),
+      h('div', { cls: 'pl-ctrl' },
+        h('button', { cls: 'pl-btn', title: T('Início'), onclick: () => this.seek(0) }, '⏮'), this.btn,
+        this.bar, this.time, this.loopBtn));
+    this.key = e => {
+      if (e.key === ' ' || e.key === 'k') { e.preventDefault(); this.toggle(); }
+      else if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); this.seek(this.t + 100); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); this.seek(this.t - 100); }
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', this.key, true);
+    document.body.append(this.root);
+    ed.player = this; Analytics.track('player_open');
+    this.play();
+  }
+  fmt(ms) { return (ms / 1000).toFixed(2).replace('.', ',') + 's'; }
+  ui() { this.bar.value = Math.round(this.t); this.time.textContent = `${this.fmt(this.t)} / ${this.fmt(this.total)}`; this.btn.textContent = this.playing ? '⏸' : '▶'; }
+  play() {
+    if (this.t >= this.total - 1) this.t = 0;
+    this.playing = true; this.start = performance.now() - this.t;
+    if ((this.project.audio || []).length) AudioEngine.play(this.project, this.t);
+    this.ui(); this.surf.invalidate();
+  }
+  pause() { this.playing = false; AudioEngine.stop(); this.ui(); }
+  toggle() { this.playing ? this.pause() : this.play(); }
+  seek(ms) {
+    this.t = Math.max(0, Math.min(this.total - 1, ms));
+    if (this.playing) { this.start = performance.now() - this.t; if ((this.project.audio || []).length) AudioEngine.play(this.project, this.t); }
+    this.ui(); this.surf.invalidate();
+  }
+  draw(ctx, w, hh) {
+    if (this.playing) {
+      this.t = performance.now() - this.start;
+      if (this.t >= this.total) {
+        if (this.loop) { this.t = 0; this.start = performance.now(); if ((this.project.audio || []).length) AudioEngine.play(this.project, 0); }
+        else { this.t = this.total - 1; this.pause(); }
+      }
+      this.ui();
+    }
+    ctx.fillStyle = '#05060A'; ctx.fillRect(0, 0, w, hh);
+    const k = Math.min(w / W, hh / H), ox = (w - W * k) / 2, oy = (hh - H * k) / 2;
+    ctx.save(); ctx.translate(ox, oy); ctx.scale(k, k); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    const fi = Scene.renderTime(ctx, this.project, Math.min(this.t, this.total - 1));
+    ctx.restore();
+    this.ed.onPlayTime(this.t, fi);
+    if (this.playing) this.surf.invalidate();
+  }
+  close() {
+    AudioEngine.stop(); this.playing = false;
+    window.removeEventListener('keydown', this.key, true);
+    this.root.remove(); this.surf.ro && this.surf.ro.disconnect(); Surface.all.delete(this.surf);
+    const ed = this.ed; ed.player = null; ed.timeline.playFrame = -1; ed.timeline.playT = -1;
+    ed.selectFrame(Scene.frameAt(this.project, this.t), false);
+  }
+}
+
+// ---------- packs padrão: itens que todo mundo recebe na primeira vez ----------
+const DefaultPacks = {
+  async install() {
+    let man; try { man = await (await fetch('packs/packs.json', { cache: 'no-cache' })).json(); } catch (e) { return; }
+    const done = new Set(LS.get('packsDone', []));
+    const todo = (man.packs || []).filter(p => !done.has(p.file) && /^[\w.\- ]+\.(atp|ati)$/i.test(p.file));
+    if (!todo.length) return;
+    for (const p of todo) {
+      try {
+        const blob = await (await fetch('packs/' + encodeURIComponent(p.file))).blob();
+        const r = await Importer.importBuffer(await blob.arrayBuffer(), p.file);
+        for (const t of r.items) if (!Store.items.some(x => x.t.name === t.name)) await Store.saveItem(t, null, { folder: p.folder || p.file, tags: [] });
+        done.add(p.file); LS.set('packsDone', [...done]);
+      } catch (e) { console.warn('pack padrão', p.file, e.message); }
+    }
+    await Store.loadItems();
+  },
+};
 
 // ---------- palco ----------
 class Stage {
@@ -694,7 +862,7 @@ class Stage {
       const fi = Scene.renderTime(ctx, this.project, t);
       this.ed.onPlayTime(t, fi);
     } else {
-      Scene.drawBg(ctx, this.project);
+      Scene.drawBg(ctx, this.project, this.project.frames[this.ed.frame]);
       const fi = this.ed.frame, f = this.frame;
       if (fi > 0) { const prev = this.project.frames[fi - 1]; Scene.resolve(this.project, prev); Scene.drawFrame(ctx, this.project, prev, 0x55A0A0A0); }
       Scene.resolve(this.project, f);
@@ -703,7 +871,8 @@ class Stage {
       const big = 1e5;
       ctx.fillStyle = UI.outside; ctx.beginPath();
       ctx.rect(-big, -big, big * 2 + W, big * 2 + H); ctx.rect(0, 0, W, H); ctx.fill('evenodd');
-      this.drawJoints(ctx, f); this.drawHandles(ctx, f);
+      if (!this.ed.camMode) { this.drawJoints(ctx, f); this.drawHandles(ctx, f); }
+      this.drawCamera(ctx, f);
     }
     ctx.restore();
     ctx.strokeStyle = UI.frameLine; ctx.lineWidth = 1; ctx.strokeRect(this.offX - 0.5, this.offY - 0.5, W * this.sc + 1, H * this.sc + 1);
@@ -785,6 +954,23 @@ class Stage {
     Scene.resolve(this.project, f);
     toast('Item preso');
   }
+  /** Quadro azul da câmera (com alça de zoom no canto quando o modo câmera está ligado). */
+  drawCamera(ctx, f) {
+    const c = Scene.camOf(f), hh = c.w * H / W, on = this.ed.camMode, full = !f.cam;
+    if (!on && full) return;
+    ctx.save();
+    ctx.lineWidth = (on ? 3 : 2) / this.sc; ctx.strokeStyle = '#4C8DFF';
+    if (!on) ctx.setLineDash([10 / this.sc, 6 / this.sc]);
+    ctx.strokeRect(c.x, c.y, c.w, hh); ctx.setLineDash([]);
+    if (on) {
+      ctx.fillStyle = 'rgba(76,141,255,0.10)'; ctx.fillRect(c.x, c.y, c.w, hh);
+      const r = 11 / this.sc; ctx.fillStyle = '#4C8DFF';
+      ctx.beginPath(); ctx.arc(c.x + c.w, c.y + hh, r, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `${13 / this.sc}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⤡', c.x + c.w, c.y + hh); ctx.fillText('🎥', c.x + 16 / this.sc, c.y + 16 / this.sc);
+    }
+    ctx.restore();
+  }
   // ----- toque / mouse -----
   toStage(e) { const r = this.s.el.getBoundingClientRect(); return [(e.clientX - r.left - this.offX) / this.sc, (e.clientY - r.top - this.offY) / this.sc]; }
   local(e) { const r = this.s.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
@@ -797,6 +983,13 @@ class Stage {
     const [x, y] = this.toStage(e), f = this.frame;
     Scene.resolve(this.project, f);
     this.mode = 'none'; this.sx0 = x; this.sy0 = y;
+    if (this.ed.camMode) {
+      const c = Scene.camOf(f), ch = c.w * H / W, grab = 22 / this.sc;
+      if (Math.hypot(x - (c.x + c.w), y - (c.y + ch)) < grab) this.mode = 'camScale';
+      else if (x > c.x && x < c.x + c.w && y > c.y && y < c.y + ch) this.mode = 'camMove';
+      if (this.mode !== 'none') { this.ed.beforeChange(true); this.cam0 = { ...c }; this.s.invalidate(); return; }
+      this.mode = 'pan'; [this.panX, this.panY] = this.local(e); return;
+    }
     if (!this.pickHandle(f, x, y) && !this.pickJoint(f, x, y) && !this.pickBody(f, x, y)) {
       this.selected = -1; this.mode = 'pan'; [this.panX, this.panY] = this.local(e);
       this.s.invalidate(); return;
@@ -833,6 +1026,15 @@ class Stage {
       const [lx, ly] = this.local(e); this.offX += lx - this.panX; this.offY += ly - this.panY; this.panX = lx; this.panY = ly;
       this.s.invalidate(); return;
     }
+    if (this.mode === 'camMove' || this.mode === 'camScale') {
+      const [x, y] = this.toStage(e), c0 = this.cam0, f = this.frame;
+      if (this.mode === 'camMove') f.cam = { x: c0.x + x - this.sx0, y: c0.y + y - this.sy0, w: c0.w };
+      else { // a alça do canto muda o tamanho mantendo 16:9 (canto de cima à esquerda fixo)
+        const w = Math.max(Scene.CAM_MIN, Math.min(Scene.CAM_MAX, Math.max(x - c0.x, (y - c0.y) * W / H)));
+        f.cam = { x: c0.x, y: c0.y, w };
+      }
+      this.s.invalidate(); return;
+    }
     const [x, y] = this.toStage(e), f = this.frame, p = f.p[this.dragInst], s0 = this.startPose;
     if (!p || !s0) return;
     Scene.resolve(this.project, f);
@@ -856,6 +1058,7 @@ class Stage {
     this.pointers.delete(e.pointerId);
     if (this.mode === 'pinch') { if (this.pointers.size === 0) this.mode = 'none'; return; }
     if (this.mode === 'pan') { this.mode = 'none'; return; }
+    if (this.mode === 'camMove' || this.mode === 'camScale') { this.mode = 'none'; this.ed.changed(); return; }
     if (this.mode === 'move') this.tryAttach(this.dragInst);
     if (this.mode !== 'none') this.ed.changed();
     this.mode = 'none';
@@ -930,7 +1133,11 @@ class Timeline {
   width(d) { return this.base + d * this.perMs; }
   cellLeft(i) { let x = this.gap - this.scroll; for (let k = 0; k < i; k++) x += this.width(this.fr[k].d) + this.gap; return x; }
   cellAt(x) { for (let i = 0; i < this.fr.length; i++) { const l = this.cellLeft(i); if (x >= l && x <= l + this.width(this.fr[i].d)) return i; } return -1; }
-  contentWidth() { return this.cellLeft(this.fr.length) + this.scroll + this.base; }
+  contentWidth() {
+    const frames = this.cellLeft(this.fr.length) + this.scroll + this.base;
+    const end = Math.max(0, ...(this.ed.project.audio || []).map(c => c.start + c.dur));
+    return Math.max(frames, end ? this.timeToX(end) + this.scroll + this.base : 0);
+  }
   clamp() { this.scroll = Math.max(0, Math.min(this.scroll, Math.max(0, this.contentWidth() - this.s.w))); }
   /** Tempo (ms) → posição x, seguindo os blocos (cada bloco ocupa o tempo daquele quadro). */
   timeToX(t) {
@@ -950,6 +1157,7 @@ class Timeline {
     this.clamp(); this.s.invalidate();
   }
   draw(ctx, w, hh) {
+    if (this.onDraw) this.onDraw();
     ctx.fillStyle = UI.trackBg; ctx.fillRect(0, 0, w, hh);
     const fr = this.fr, top = 14, bot = this.frameH - 4;
     for (const i of [...this.multi]) if (i >= fr.length) this.multi.delete(i);
@@ -1022,6 +1230,11 @@ class Timeline {
         this.mode = 'pinch'; this.pinch0 = Math.max(10, Math.abs(a[0] - b[0])); this.pinchScale = 1;
         this.snap(this.selClip); this.ed.beforeChange(); this.moved = true;
         return;
+      }
+      if (this.cutMode) {
+        const hit = this.clipAt(x);
+        if (hit) { this.selClip = hit; this.ed.splitClip(hit, this.xToTime(x)); }
+        this.mode = 'none'; return;
       }
       let c = this.clipAt(x);
       if (!c && this.selClip) { const sx0 = this.timeToX(this.selClip.start), sx1 = this.timeToX(this.selClip.start + this.selClip.dur); if (x > sx0 - 14 && x < sx1 + 14) c = this.selClip; }
@@ -1333,6 +1546,7 @@ class Builder {
 (async () => {
   await DB.open();
   await Store.loadItems();
+  DefaultPacks.install(); // packs que vêm com o app (em segundo plano)
   await Monet.init(); Analytics.start(); Monet.refreshLicense(); initCloud();
   await showHome();
   const imp = new URLSearchParams(location.search).get('import'); // depuração: ?import=arquivo.atp

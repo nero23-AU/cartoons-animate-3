@@ -66,7 +66,7 @@ const Storage = {
   referencedImages(itemRecs, projRecs) {
     const out = new Set();
     itemRecs.forEach(r => Storage.imgsOfTemplate(r.t, out));
-    projRecs.forEach(r => { r.p.inst.forEach(i => Storage.imgsOfTemplate(i.t, out)); if (r.p.bgImg) out.add(r.p.bgImg); });
+    projRecs.forEach(r => { r.p.inst.forEach(i => Storage.imgsOfTemplate(i.t, out)); if (r.p.bgImg) out.add(r.p.bgImg); r.p.frames.forEach(f => { if (f.bgImg) out.add(f.bgImg); }); });
     return out;
   },
   async report() {

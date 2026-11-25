@@ -93,6 +93,7 @@ const Cloud = {
     const img = new Set(), aud = new Set();
     p.inst.forEach(i => Storage.imgsOfTemplate(i.t, img));
     if (p.bgImg) img.add(p.bgImg);
+    p.frames.forEach(f => { if (f.bgImg) img.add(f.bgImg); });
     (p.audio || []).forEach(c => aud.add(c.aid));
     return [...[...img].map(k => ['images', k]), ...[...aud].map(k => ['audio', k])];
   },

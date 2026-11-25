@@ -57,6 +57,20 @@ const Scene = {
     return Xf.toWorld(p, r.ex[bi], r.ey[bi]);
   },
 
+  // ----- câmera (enquadramento 16:9 por quadro; ausente = o palco inteiro) -----
+  CAM_MIN: W * 0.15, CAM_MAX: W * 2,
+  camOf(f) { const c = f && f.cam; return c ? c : { x: 0, y: 0, w: W }; },
+  camAtTime(project, t) {
+    const fr = project.frames, fi = Scene.frameAt(project, t), a = Scene.camOf(fr[fi]);
+    if (fi === fr.length - 1) return a;
+    const b = Scene.camOf(fr[fi + 1]), u = Math.max(0, Math.min(1, (t - Scene.frameStart(project, fi)) / fr[fi].d)), k = u * u * (3 - 2 * u);
+    // zoom interpolado de forma geométrica (fica natural)
+    const w = a.w * Math.pow(b.w / a.w, k);
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, w };
+  },
+  /** Aplica a câmera: o retângulo da câmera passa a ocupar o quadro de saída (1280×720). */
+  applyCam(ctx, c) { const k = W / c.w; ctx.scale(k, k); ctx.translate(-c.x, -c.y); },
+
   // ----- tempo -----
   frameAt(project, t) {
     let acc = 0; const fr = project.frames;
@@ -121,17 +135,26 @@ const Scene = {
    * várias amostras de tempo sobrepostas, como um efeito de transição de editor de vídeo.
    */
   /** Fundo: cor e, se houver, imagem cobrindo o quadro (corta as sobras, como "cover"). */
-  drawBg(ctx, project) {
+  /** Imagem de fundo do quadro (cada quadro pode ter a sua; projetos antigos usam a do projeto). */
+  bgOf(project, frame) { return frame && 'bgImg' in frame ? frame.bgImg : project.bgImg; },
+  drawBg(ctx, project, frame) {
     ctx.fillStyle = css(project.bg); ctx.fillRect(0, 0, W, H);
-    const img = project.bgImg && Images.get(project.bgImg);
+    const name = Scene.bgOf(project, frame), img = name && Images.get(name);
     if (!img) return;
     const fit = project.bgFit || 'cover';
     const k = fit === 'contain' ? Math.min(W / img.width, H / img.height) : fit === 'stretch' ? 0 : Math.max(W / img.width, H / img.height);
     if (!k) ctx.drawImage(img, 0, 0, W, H);
     else { const w = img.width * k, hh = img.height * k; ctx.drawImage(img, (W - w) / 2, (H - hh) / 2, w, hh); }
   },
-  renderTime(ctx, project, t, { transparent = false, samples = 6 } = {}) {
-    if (!transparent) Scene.drawBg(ctx, project);
+  renderTime(ctx, project, t, opts = {}) {
+    ctx.save();
+    const cam = Scene.camAtTime(project, t);
+    if (!opts.transparent) { ctx.fillStyle = css(project.bg); ctx.fillRect(0, 0, W, H); } // fora do palco (câmera afastada)
+    Scene.applyCam(ctx, cam);
+    try { return Scene.renderScene(ctx, project, t, opts); } finally { ctx.restore(); }
+  },
+  renderScene(ctx, project, t, { transparent = false, samples = 6 } = {}) {
+    if (!transparent) Scene.drawBg(ctx, project, project.frames[Scene.frameAt(project, t)]);
     const fi = Scene.frameAt(project, t), fx = project.frames[fi].fx;
     if (!fx || !fx.mb || fi === project.frames.length - 1) {
       const { frame } = Scene.frameAtTime(project, t);
