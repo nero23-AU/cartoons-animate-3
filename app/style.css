@@ -80,3 +80,10 @@ body.has-banner.banner-wide #app { height: calc(100% - 90px); }
 #rotate { display: none; position: fixed; inset: 0; z-index: 100; background: #2a2a33; color: #fff; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-size: 18px; text-align: center; padding: 20px; }
 #rotate button { background: var(--green); color: #fff; border: 0; border-radius: 10px; padding: 12px 18px; font-size: 16px; font-weight: bold; }
 @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+
+/* idiomas: bandeiras ao lado do título da tela inicial */
+.lang-picker { display: inline-flex; gap: 6px; margin-left: 12px; vertical-align: middle; }
+.lang-btn { display: inline-flex; align-items: center; gap: 5px; background: #33333d; color: #ddd; border: 1px solid #44444f; border-radius: 6px; padding: 3px 7px 3px 4px; font: bold 11px sans-serif; cursor: pointer; }
+.lang-btn.on { border-color: var(--green); color: #fff; background: #3a4a2a; }
+.lang-btn .flag { display: inline-block; width: 22px; height: 15px; border-radius: 2px; overflow: hidden; line-height: 0; }
+.lang-btn .flag svg { width: 100%; height: 100%; }

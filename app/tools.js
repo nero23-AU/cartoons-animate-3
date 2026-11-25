@@ -66,7 +66,7 @@ const Storage = {
   referencedImages(itemRecs, projRecs) {
     const out = new Set();
     itemRecs.forEach(r => Storage.imgsOfTemplate(r.t, out));
-    projRecs.forEach(r => r.p.inst.forEach(i => Storage.imgsOfTemplate(i.t, out)));
+    projRecs.forEach(r => { r.p.inst.forEach(i => Storage.imgsOfTemplate(i.t, out)); if (r.p.bgImg) out.add(r.p.bgImg); });
     return out;
   },
   async report() {
@@ -97,7 +97,7 @@ function showStorage() {
   const body = h('div', { style: { width: '380px', whiteSpace: 'pre-line' } }, 'Calculando…');
   modal('Armazenamento', body, [['Fechar', null]]);
   Storage.report().then(rep => {
-    const line = (l, [n, s]) => h('div', { cls: 'row', style: { justifyContent: 'space-between', padding: '4px 0' } }, h('span', {}, `${l} (${n})`), h('b', {}, fmtMB(s)));
+    const line = (l, [n, s]) => h('div', { cls: 'row', style: { justifyContent: 'space-between', padding: '4px 0' } }, h('span', {}, `${T(l)} (${n})`), h('b', {}, fmtMB(s)));
     const junkN = rep.orphanImg.length + rep.orphanAud.length + rep.emptyProj.length;
     body.replaceChildren(
       line('Projetos', rep.projects), line('Itens', rep.items), line('Imagens', rep.images), line('Áudios', rep.audio),
@@ -208,9 +208,7 @@ const Exporter = {
       const off = new OfflineAudioContext(2, Math.max(1, len), sr);
       for (const c of clips) {
         const buf = await AudioEngine.buffer(c.aid); if (!buf) continue;
-        const src = off.createBufferSource(); src.buffer = buf;
-        const g = off.createGain(); g.gain.value = c.gain ?? 1; src.connect(g).connect(off.destination);
-        src.start(c.start / 1000);
+        AudioEngine.schedule(off, off.destination, c, buf, 0);
       }
       for (const [codec, mux] of [['mp4a.40.2', 'aac'], ['opus', 'opus']]) {
         const c = { codec, sampleRate: sr, numberOfChannels: 2, bitrate: 160000 };

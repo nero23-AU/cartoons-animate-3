@@ -120,8 +120,18 @@ const Scene = {
    * Motion blur: se o quadro tiver fx.mb (0..1), a transição até o próximo é desenhada com
    * várias amostras de tempo sobrepostas, como um efeito de transição de editor de vídeo.
    */
+  /** Fundo: cor e, se houver, imagem cobrindo o quadro (corta as sobras, como "cover"). */
+  drawBg(ctx, project) {
+    ctx.fillStyle = css(project.bg); ctx.fillRect(0, 0, W, H);
+    const img = project.bgImg && Images.get(project.bgImg);
+    if (!img) return;
+    const fit = project.bgFit || 'cover';
+    const k = fit === 'contain' ? Math.min(W / img.width, H / img.height) : fit === 'stretch' ? 0 : Math.max(W / img.width, H / img.height);
+    if (!k) ctx.drawImage(img, 0, 0, W, H);
+    else { const w = img.width * k, hh = img.height * k; ctx.drawImage(img, (W - w) / 2, (H - hh) / 2, w, hh); }
+  },
   renderTime(ctx, project, t, { transparent = false, samples = 6 } = {}) {
-    if (!transparent) { ctx.fillStyle = css(project.bg); ctx.fillRect(0, 0, W, H); }
+    if (!transparent) Scene.drawBg(ctx, project);
     const fi = Scene.frameAt(project, t), fx = project.frames[fi].fx;
     if (!fx || !fx.mb || fi === project.frames.length - 1) {
       const { frame } = Scene.frameAtTime(project, t);

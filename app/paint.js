@@ -79,7 +79,14 @@ class PaintEditor {
     el.addEventListener('pointerup', e => this.up(e));
     el.addEventListener('pointercancel', e => this.up(e));
     el.addEventListener('wheel', e => { e.preventDefault(); const [mx, my] = this.loc(e); this.zoomAt(mx, my, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
-    this.root = h('div', { style: { position: 'fixed', inset: '0', display: 'flex', background: 'var(--bg)', zIndex: 5 } }, left, this.toolsEl, el, side);
+    this.root = h('div', { cls: 'paint-root', style: { position: 'fixed', inset: '0', display: 'flex', background: 'var(--bg)', zIndex: 5 } }, left, this.toolsEl, el, side);
+    this.keyFn = e => {
+      if (document.querySelector('#modal-root .modal-bg') || !(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); this.redo(); }
+    };
+    window.addEventListener('keydown', this.keyFn, true);
     document.body.append(this.root);
     this.refreshTools();
   }
@@ -253,7 +260,7 @@ class PaintEditor {
     this.tool = 'lasso'; this.refreshTools(); this.refreshLayers();
     toast('Imagem importada. Use RECORTE para separar a parte, MOVER para posicionar.');
   }
-  close() { this.root.remove(); }
+  close() { window.removeEventListener('keydown', this.keyFn, true); this.root.remove(); }
   async save() {
     const d = this.doc;
     const flat = document.createElement('canvas'); flat.width = d.w; flat.height = d.h;

@@ -155,6 +155,19 @@ async function hashBlob(blob) {
   for (let i = 0; i < u.length; i++) { h1 = Math.imul(h1 ^ u[i], 16777619); h2 = (h2 + u[i] * (i + 1)) | 0; }
   return (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16) + u.length.toString(16);
 }
+/** Reduz fotos muito grandes (ex.: 12 MP da câmera) para no máximo `max` px no lado maior. */
+async function fitImageBlob(file, max) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    if (k === 1 && file.size < 4e6) return file;
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const png = file.type === 'image/png';
+    return await new Promise(res => c.toBlob(res, png ? 'image/png' : 'image/jpeg', 0.9));
+  } finally { URL.revokeObjectURL(url); }
+}
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 // ---------- renderização ----------

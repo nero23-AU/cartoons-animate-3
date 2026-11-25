@@ -60,7 +60,7 @@ const WebAds = {
   // ---------- banner fixo embaixo (só nos menus) ----------
   banner(on) {
     let el = document.getElementById('web-banner');
-    if (!on) { if (el) el.remove(); document.body.classList.remove('has-banner'); return; }
+    if (!on) { if (el) el.remove(); document.body.classList.remove('has-banner', 'banner-wide'); return; }
     if (el) return;
     const wide = this.wide() && (this.provider() !== 'adsterra' || (CONFIG.adsterra || {}).banner728);
     const u = this.unit(wide ? 728 : 320, wide ? 90 : 50);

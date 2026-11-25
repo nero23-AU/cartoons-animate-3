@@ -8,9 +8,10 @@ function h(tag, props = {}, ...kids) {
     if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else if (k === 'cls') e.className = v;
+    else if (k === 'placeholder' || k === 'title') e[k] = T(v);
     else e[k] = v;
   }
-  for (const c of kids.flat()) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(c));
+  for (const c of kids.flat()) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(typeof c === 'string' ? T(c) : c));
   return e;
 }
 const $app = () => document.getElementById('app');
@@ -98,7 +99,7 @@ function projectThumb(p, w, h2) {
     ctx.save(); ctx.translate((cw - W * k) / 2, (ch - H * k) / 2); ctx.scale(k, k);
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     const f = clone(p.frames[0]); Scene.resolve(p, f);
-    ctx.fillStyle = css(p.bg); ctx.fillRect(0, 0, W, H); Scene.drawFrame(ctx, p, f);
+    Scene.drawBg(ctx, p); Scene.drawFrame(ctx, p, f);
     ctx.restore();
   });
   s.el.style.width = w + 'px'; s.el.style.height = h2 + 'px';
@@ -118,7 +119,7 @@ async function showHome() {
       projectThumb(r.p, 200, 112),
       h('div', { cls: 'row', style: { alignItems: 'center' } },
         h('div', { style: { flex: 1, padding: '6px 0', fontSize: '14px' } }, r.name || 'Sem nome',
-          h('div', { style: { color: '#aaa', fontSize: '12px' } }, `${r.p.frames.length} quadros · ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`)),
+          h('div', { style: { color: '#aaa', fontSize: '12px' } }, `${r.p.frames.length} quadros · ${d.toLocaleDateString(I18N.locale)} ${d.toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' })}`)),
         h('div', { cls: 'dots', style: { padding: '0 6px', fontSize: '22px' }, onclick: e => { e.stopPropagation(); projMenu(r); } }, '⋮'))));
   });
   if (projects.length && projects.length < 3) { const ad = Monet.nativeCard('home_projects', 200, 150); if (ad) grid.append(ad); }
@@ -128,7 +129,7 @@ async function showHome() {
     if (i === 0) new Editor(r.p);
     if (i === 1) askText('Nome', r.name, async n => { r.p.name = n; await Store.saveProject(r.p); showHome(); });
     if (i === 2) { const c = clone(r.p); c.id = uid(); c.name = r.name + ' (cópia)'; await Store.saveProject(c); showHome(); }
-    if (i === 3) modal(`Excluir "${r.name}"?`, h('div', {}, 'Isso não pode ser desfeito.'), [['Cancelar', null], ['Excluir', async () => { await Store.deleteProject(r.id); showHome(); }]]);
+    if (i === 3) modal(`Excluir "${r.name}"?`, h('div', {}, 'Isso não pode ser desfeito.'), [['Cancelar', null], ['Excluir', async () => { await Store.deleteProject(r.id); Cloud.remove(r.id); showHome(); }]]);
   });
   const big = (g, l, c, f) => h('div', { cls: 'tool', style: { color: c, padding: '14px 4px' }, onclick: f },
     h('div', { style: { width: '64px', height: '64px', borderRadius: '16px', background: c, color: '#fff', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, g),
@@ -138,7 +139,7 @@ async function showHome() {
     h('div', { cls: 'col', style: { flex: '1', minWidth: 0 } },
       h('div', { style: { padding: '14px 16px 0', fontSize: '18px', fontWeight: 'bold' } }, 'Minhas animações',
         h('span', { style: { fontSize: '12px', color: '#9a9aa4', fontWeight: 'normal', marginLeft: '10px' } },
-          Monet.slots() === Infinity ? '' : `${projects.length} de ${Monet.slots()} espaços usados`)),
+          Monet.slots() === Infinity ? '' : `${projects.length} de ${Monet.slots()} espaços usados`), I18N.picker()),
       h('div', { cls: 'scroll', style: { flex: 1 } }, grid)),
     h('div', { cls: 'col scroll', style: { width: '130px', background: 'var(--bar)' } },
       big('🎬', 'NOVO\nCARTOON', 'var(--green)', async () => {
@@ -148,6 +149,7 @@ async function showHome() {
       big('🧩', 'CONSTRUTOR\nDE ITENS', 'var(--cyan)', () => showItems()),
       big('💾', 'BACKUP', 'var(--orange)', () => showBackup()),
       big('🧹', 'ARMAZE-\nNAMENTO', 'var(--grey)', () => showStorage()),
+      Auth.enabled() ? big(Auth.user() ? '☁' : '👤', 'CONTA', '#3D8FC7', () => showAccount()) : null,
       Monet.adsRemoved() ? null : big('⭐', 'SEM\nANÚNCIOS', 'var(--purple)', () => Monet.storeMenu())));
 }
 
@@ -214,7 +216,7 @@ function showItems(back = showHome) {
       list.append(h('div', { cls: 'item-row', onclick: () => openBuilder(clone(t), false, () => showItems(back)) },
         thumb(t, 80, 80),
         h('div', { cls: 'nm' }, (r.fav ? '★ ' : '') + t.name,
-          h('small', {}, [r.folder ? '📁 ' + r.folder : '', (r.tags || []).map(x => '#' + x).join(' '), new Date(r.time).toLocaleDateString('pt-BR')].filter(Boolean).join('  ·  '))),
+          h('small', {}, [r.folder ? '📁 ' + r.folder : '', (r.tags || []).map(x => '#' + x).join(' '), new Date(r.time).toLocaleDateString(I18N.locale)].filter(Boolean).join('  ·  '))),
         h('div', { cls: 'dots', onclick: e => { e.stopPropagation(); itemMenu(r); } }, '⋮')));
     });
   };
@@ -268,15 +270,16 @@ class Editor {
     Editor.current = this;
     this.onHide = () => this.saveNow();
     document.addEventListener('visibilitychange', this.onHide); window.addEventListener('pagehide', this.onHide);
-    this.keyFn = e => this.onKey(e); document.addEventListener('keydown', this.keyFn);
+    this.keyFn = e => this.onKey(e); window.addEventListener('keydown', this.keyFn, true);
     (project.audio || []).forEach(c => AudioEngine.buffer(c.aid));
     this.saveNow();
   }
   /** Atalhos de teclado (computador). */
   onKey(e) {
-    if (Editor.current !== this || document.querySelector('#modal-root .modal-bg')) return;
-    const tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    if (Editor.current !== this || document.querySelector('#modal-root .modal-bg') || document.querySelector('.paint-root')) return;
+    const t = e.target, tag = (t.tagName || '').toLowerCase();
+    if (tag === 'textarea' || t.isContentEditable || (tag === 'input' && !/^(range|checkbox|radio|button|color)$/.test(t.type))) return;
+    if (tag === 'button' || tag === 'input') t.blur(); // um botão com foco não "rouba" Espaço/Enter
     const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
     let hit = true;
     if (mod && k === 'z' && !e.shiftKey) this.undo();
@@ -294,11 +297,12 @@ class Editor {
     else if (k === 'delete' || k === 'backspace') { if (this.stage.selected >= 0) this.removeSelected(); else this.deleteFrame(); }
     else if (k === 'escape') { this.closePanel(); this.stage.selected = -1; this.refresh(); }
     else if (k === 'i') { this.insertFolder = null; this.togglePanel('insert'); }
+    else if (k === 's' && this.timeline.selClip) this.splitClip(this.timeline.selClip);
     else hit = false;
     if (hit) e.preventDefault();
   }
   dispose() {
-    document.removeEventListener('keydown', this.keyFn);
+    window.removeEventListener('keydown', this.keyFn, true);
     this.saveNow(); AudioEngine.stop();
     document.removeEventListener('visibilitychange', this.onHide); window.removeEventListener('pagehide', this.onHide);
     if (Editor.current === this) Editor.current = null;
@@ -383,7 +387,8 @@ class Editor {
     clearTimeout(this.saveT);
     const t0 = performance.now();
     return Store.saveProject(this.project).then(() => {
-      if (this.saveLabel) this.saveLabel.textContent = 'salvo automaticamente ✓';
+      if (this.saveLabel) this.saveLabel.textContent = T('salvo automaticamente ✓');
+      Cloud.queue(this.project);
       this.lastSaveMs = performance.now() - t0;
     }).catch(e => { console.error(e); toast('Falha ao salvar: ' + e.message); });
   }
@@ -417,6 +422,25 @@ class Editor {
     if (asNew) { this.project.frames.splice(this.frame + 1, 0, clone(this.clipboard)); this.selectFrame(this.frame + 1, false); }
     else this.project.frames[this.frame] = clone(this.clipboard);
     this.changed();
+  }
+  /** Fundo: cor sólida ou imagem da galeria / dos arquivos do computador. */
+  backgroundMenu() {
+    const p = this.project, opts = ['🎨 Cor sólida', '🖼 Imagem da galeria ou do computador…'];
+    if (p.bgImg) opts.push('↔ Ajuste da imagem: ' + ({ cover: 'preencher', contain: 'inteira', stretch: 'esticar' }[p.bgFit || 'cover']), '✖ Remover imagem de fundo');
+    choose('Plano de fundo', opts, async i => {
+      if (i === 0) return pickColor('Cor do fundo', c => { this.beforeChange(); p.bg = c; this.changed(); });
+      if (i === 1) {
+        const [f] = await pickFiles({ accept: 'image/*' }); if (!f) return;
+        try {
+          const blob = await fitImageBlob(f, 2560);
+          const name = await Images.save(blob);
+          this.beforeChange(); p.bgImg = name; p.bgFit = p.bgFit || 'cover'; this.changed();
+          Analytics.track('bg_image'); toast('Imagem de fundo aplicada');
+        } catch (e) { toast('Não consegui abrir essa imagem'); }
+      }
+      if (i === 2) { const order = ['cover', 'contain', 'stretch']; this.beforeChange(); p.bgFit = order[(order.indexOf(p.bgFit || 'cover') + 1) % 3]; this.changed(); }
+      if (i === 3) { this.beforeChange(); delete p.bgImg; this.changed(); }
+    });
   }
   /** Efeito de transição entre este quadro e o próximo (como em editores de vídeo). */
   frameEffect() {
@@ -504,8 +528,30 @@ class Editor {
     }
     if (n) { this.changed(); Analytics.track('audio_add', { n }); toast(`${n} áudio(s) adicionado(s) a partir do quadro ${this.frame + 1}. Arraste o clipe para ajustar.`); }
   }
+  /** Divide o bloco de áudio em dois no começo do quadro atual (ou no cursor de reprodução). */
+  splitClip(c) {
+    c = c || this.timeline.selClip; if (!c) return toast('Toque num bloco de áudio para selecioná-lo');
+    const t = Scene.frameStart(this.project, this.frame), rate = c.rate || 1;
+    if (t <= c.start + 20 || t >= c.start + c.dur - 20) return toast('Selecione um quadro que fique no meio deste áudio para cortar ali');
+    this.beforeChange();
+    const a = t - c.start;
+    const b = { ...c, id: uid(), start: t, dur: c.dur - a, off: (c.off || 0) + a * rate };
+    c.dur = a;
+    this.project.audio.splice(this.project.audio.indexOf(c) + 1, 0, b);
+    this.timeline.selClip = b; this.changed(); toast('Áudio cortado em 2 blocos');
+  }
+  clipSpeed(c) {
+    const pct = v => Math.round(100 / v) + '%';
+    const val = h('span', {}, pct(c.rate || 1));
+    const r = h('input', { type: 'range', min: 25, max: 400, value: Math.round(100 / (c.rate || 1)), style: { width: '100%' }, oninput: e => val.textContent = e.target.value + '%' });
+    modal('Esticar áudio', h('div', { style: { width: '300px' } }, h('div', { style: { fontSize: '13px', color: '#666', marginBottom: '6px' } }, 'Tamanho do bloco: mais de 100% deixa o áudio mais lento e longo; menos deixa mais rápido e curto.'), val, r),
+      [['Cancelar', null], ['100%', () => { this.beforeChange(); this.setRate(c, 1); this.changed(); }], ['OK', () => { this.beforeChange(); this.setRate(c, 100 / +r.value); this.changed(); }]]);
+  }
+  setRate(c, rate) { const src = c.dur * (c.rate || 1); c.rate = Math.max(0.25, Math.min(4, rate)); c.dur = Math.round(src / c.rate / 10) * 10; }
   clipMenu(c) {
-    choose(c.name, ['Volume…', 'Começar no quadro atual', 'Remover áudio'], i => {
+    choose(c.name, ['Volume…', 'Começar no quadro atual', 'Remover áudio', '✂ Cortar no quadro atual (dividir em 2 blocos)', '↔ Velocidade / esticar…'], i => {
+      if (i === 3) return this.splitClip(c);
+      if (i === 4) return this.clipSpeed(c);
       if (i === 0) {
         const val = h('span', {}, Math.round((c.gain ?? 1) * 100) + '%');
         const r = h('input', { type: 'range', min: 0, max: 200, value: Math.round((c.gain ?? 1) * 100), style: { width: '100%' }, oninput: e => val.textContent = e.target.value + '%' });
@@ -550,16 +596,16 @@ class Editor {
         tool('🗑', 'REMOVER', 'var(--red)', () => this.removeSelected()));
     }
     if (kind === 'menu') {
-      const item = (g, l, f) => p.append(h('div', { cls: 'menu-item', onclick: f }, `${g}   ${l}`));
+      const item = (g, l, f) => p.append(h('div', { cls: 'menu-item', onclick: f }, `${g}   ${T(l)}`));
       item('✏', 'RENOMEAR PROJETO', () => askText('Nome do projeto', this.project.name || '', n => { this.project.name = n; this.saveNow(); toast('Renomeado'); }));
       item('🎞', 'EXPORTAR', () => { this.saveNow(); Analytics.track('export_open'); Exporter.open(this.project); });
       item('🎵', 'ADICIONAR ÁUDIO', () => this.addAudio());
-      item('🖼', 'PLANO DE FUNDO', () => pickColor('Cor do fundo', c => { this.beforeChange(); this.project.bg = c; this.changed(); }));
+      item('🖼', 'PLANO DE FUNDO', () => this.backgroundMenu());
       item('🧩', 'CRIAR ITENS', () => { this.saveNow(); const ed = this; showItems(() => { ed.buildUI(); Editor.current = ed; ed.refresh(); }); });
       item('✖', 'SAIR', () => this.saveNow().then(async () => { await showHome(); Monet.interstitial('exit_project'); }));
       p.append(h('div', { style: { color: '#9a9aa4', fontSize: '12px', padding: '10px 18px' } }, 'Tudo é salvo automaticamente.'));
       if (matchMedia('(pointer: fine)').matches) p.append(h('div', { style: { color: '#9a9aa4', fontSize: '12px', padding: '0 18px 12px', lineHeight: '1.7' } },
-        h('b', {}, 'Atalhos do teclado'), h('br'), 'Espaço: jogar/parar · ← →: quadro anterior/próximo', h('br'), 'N ou Enter: novo quadro · Delete: apagar item ou quadro', h('br'), 'Ctrl+Z / Ctrl+Y: desfazer/refazer · Ctrl+C / Ctrl+V: copiar/colar quadro', h('br'), 'I: inserir · Esc: fechar painel · Roda do mouse: zoom'));
+        h('b', {}, 'Atalhos do teclado'), h('br'), 'Espaço: jogar/parar · ← →: quadro anterior/próximo', h('br'), 'N ou Enter: novo quadro · Delete: apagar item ou quadro', h('br'), 'Ctrl+Z / Ctrl+Y: desfazer/refazer · Ctrl+C / Ctrl+V: copiar/colar quadro', h('br'), 'I: inserir · S: cortar o áudio selecionado · Esc: fechar painel', h('br'), 'Áudio: arraste as pontas para cortar · clique duplo para esticar · Roda do mouse: zoom'));
     }
     if (kind === 'insert') this.buildInsert();
     this.highlightBar();
@@ -570,7 +616,7 @@ class Editor {
     const fillList = () => {
       list.replaceChildren();
       if (folder == null && !this.insertText) {
-        for (const [k, l, n] of Library.folders()) list.append(h('div', { cls: 'folder', onclick: () => { this.insertFolder = k; this.togglePanel('insert'); } }, `${k === '★' ? '' : '📁  '}${l}  (${n})`));
+        for (const [k, l, n] of Library.folders()) list.append(h('div', { cls: 'folder', onclick: () => { this.insertFolder = k; this.togglePanel('insert'); } }, `${k === '★' ? '' : '📁  '}${T(l)}  (${n})`));
         return;
       }
       const rows = Library.query(this.insertText, folder || '');
@@ -628,7 +674,7 @@ class Stage {
       const fi = Scene.renderTime(ctx, this.project, t);
       this.ed.onPlayTime(t, fi);
     } else {
-      ctx.fillStyle = css(this.project.bg); ctx.fillRect(0, 0, W, H);
+      Scene.drawBg(ctx, this.project);
       const fi = this.ed.frame, f = this.frame;
       if (fi > 0) { const prev = this.project.frames[fi - 1]; Scene.resolve(this.project, prev); Scene.drawFrame(ctx, this.project, prev, 0x55A0A0A0); }
       Scene.resolve(this.project, f);
@@ -723,7 +769,7 @@ class Stage {
   toStage(e) { const r = this.s.el.getBoundingClientRect(); return [(e.clientX - r.left - this.offX) / this.sc, (e.clientY - r.top - this.offY) / this.sc]; }
   local(e) { const r = this.s.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   down(e) {
-    this.s.el.setPointerCapture(e.pointerId);
+    this.s.el.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, this.lx(e));
     this.pointers.set(e.pointerId, this.local(e));
     if (this.playing) return;
     if (this.pointers.size === 2) { if (this.mode !== 'none' && this.mode !== 'pan') this.ed.changed(); this.startPinch(); return; }
@@ -849,6 +895,14 @@ class Timeline {
     el.addEventListener('pointermove', e => this.move(e));
     el.addEventListener('pointerup', e => this.up(e, false));
     el.addEventListener('pointercancel', e => this.up(e, true));
+    this.ptrs = new Map(); this.stretchClip = null;
+    // computador: clique duplo num bloco de áudio liga/desliga o modo ESTICAR (as pontas mudam a velocidade)
+    el.addEventListener('dblclick', e => {
+      const [x, y] = this.lx(e); if (y <= this.frameH) return;
+      const c = this.clipAt(x); if (!c) return;
+      this.stretchClip = this.stretchClip === c ? null : c; this.selClip = c; this.s.invalidate();
+      toast(this.stretchClip ? 'Modo ESTICAR: arraste uma ponta do áudio para deixá-lo mais rápido ou mais lento' : 'Modo esticar desligado: as pontas voltam a cortar o áudio');
+    });
     el.addEventListener('wheel', e => { e.preventDefault(); this.scroll += e.deltaY + e.deltaX; this.clamp(); this.s.invalidate(); }, { passive: false });
   }
   get fr() { return this.ed.project.frames; }
@@ -902,25 +956,31 @@ class Timeline {
     const at = this.frameH, ab = hh - 4, mid = (at + ab) / 2;
     ctx.fillStyle = '#1b1b21'; ctx.fillRect(0, at, w, ab - at);
     const audio = this.ed.project.audio || [];
-    if (!audio.length) { ctx.fillStyle = '#55555f'; ctx.textAlign = 'left'; ctx.font = '12px sans-serif'; ctx.fillText('🎵 Áudio: ☰ → ADICIONAR ÁUDIO', 10, mid + 4); }
+    if (!audio.length) { ctx.fillStyle = '#55555f'; ctx.textAlign = 'left'; ctx.font = '12px sans-serif'; ctx.fillText(T('🎵 Áudio: ☰ → ADICIONAR ÁUDIO'), 10, mid + 4); }
     for (const c of audio) {
       const x0 = this.timeToX(c.start), x1 = this.timeToX(c.start + c.dur);
       if (x1 < 0 || x0 > w) continue;
-      const sel = c === this.selClip;
+      const sel = c === this.selClip, str = c === this.stretchClip;
       ctx.fillStyle = sel ? '#1E88E5' : '#26607f'; rrect(ctx, x0, at + 2, Math.max(4, x1 - x0), ab - at - 4, 4); ctx.fill();
+      if (sel) { // alças nas pontas: arraste para cortar (ou esticar, no modo esticar)
+        ctx.fillStyle = str ? '#FF9800' : '#BBDEFB';
+        rrect(ctx, x0, at + 2, 6, ab - at - 4, 3); ctx.fill(); rrect(ctx, Math.max(x0, x1 - 6), at + 2, 6, ab - at - 4, 3); ctx.fill();
+      }
       ctx.strokeStyle = sel ? '#BBDEFB' : '#6fc3ee'; ctx.lineWidth = 1; ctx.beginPath();
       for (let px = Math.max(0, Math.floor(x0)); px < Math.min(w, x1); px += 2) {
-        const amp = AudioEngine.peak(c.aid, this.xToTime(px) - c.start) * (c.gain ?? 1) * (ab - at - 8) / 2;
+        const amp = AudioEngine.clipPeak(c, this.xToTime(px)) * (c.gain ?? 1) * (ab - at - 8) / 2;
         ctx.moveTo(px, mid - amp); ctx.lineTo(px, mid + amp);
       }
       ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.font = '11px sans-serif'; ctx.fillText(c.name, Math.max(x0 + 4, 4), at + 13);
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.font = '11px sans-serif';
+      const rt = (c.rate || 1) !== 1 ? '  ' + T('(velocidade ' + Math.round(c.rate * 100) + '%)') : '';
+      ctx.fillText((str ? '↔ ' : '') + c.name + rt, Math.max(x0 + 8, 4), at + 13);
     }
     // cursor de reprodução atravessando quadros e áudio
     if (this.playT >= 0) { const px = this.timeToX(this.playT); ctx.fillStyle = '#FF5252'; ctx.fillRect(px - 1, 0, 2, hh); }
     ctx.textAlign = 'right'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#8A8A92';
     const info = this.multi.size ? `${this.multi.size} selecionados · arraste para mudar o tempo · segure para sair   ` : '';
-    ctx.fillText(info + 'total ' + (totalMs(this.ed.project) / 1000).toFixed(2).replace('.', ',') + 's', w - 6, 9);
+    ctx.fillText((info ? T(info.trim()) + '   ' : '') + T('total ' + (totalMs(this.ed.project) / 1000).toFixed(2).replace('.', ',') + 's'), w - 6, 9);
   }
   lx(e) { const r = this.s.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   clipAt(x) { for (const c of [...(this.ed.project.audio || [])].reverse()) if (x >= this.timeToX(c.start) && x <= this.timeToX(c.start + c.dur)) return c; return null; }
@@ -931,11 +991,23 @@ class Timeline {
     this.downX = x; this.lastX = x; this.moved = false; this.longFired = false; this.mode = 'scroll';
     clearTimeout(this.lp);
     if (y > this.frameH) { // faixa de áudio
-      const c = this.clipAt(x);
+      // dois dedos no áudio selecionado: pinça estica/encolhe (muda a velocidade)
+      if (this.ptrs.size === 2 && this.selClip) {
+        const [a, b] = [...this.ptrs.values()];
+        this.mode = 'pinch'; this.pinch0 = Math.max(10, Math.abs(a[0] - b[0])); this.pinchScale = 1;
+        this.snap(this.selClip); this.ed.beforeChange(); this.moved = true;
+        return;
+      }
+      let c = this.clipAt(x);
+      if (!c && this.selClip) { const sx0 = this.timeToX(this.selClip.start), sx1 = this.timeToX(this.selClip.start + this.selClip.dur); if (x > sx0 - 14 && x < sx1 + 14) c = this.selClip; }
+      if (c !== this.stretchClip) this.stretchClip = null;
       this.selClip = c; this.s.invalidate();
       if (c) {
-        this.mode = 'clip'; this.clipStart = c.start;
-        this.lp = setTimeout(() => { this.longFired = true; this.ed.clipMenu(c); }, 500);
+        const x0 = this.timeToX(c.start), x1 = this.timeToX(c.start + c.dur), edge = Math.max(8, Math.min(14, (x1 - x0) / 3));
+        const str = c === this.stretchClip;
+        this.mode = Math.abs(x - x0) <= edge ? (str ? 'stretchL' : 'trimL') : Math.abs(x - x1) <= edge ? (str ? 'stretchR' : 'trimR') : 'clip';
+        this.clipStart = c.start; this.snap(c);
+        if (this.mode === 'clip') this.lp = setTimeout(() => { this.longFired = true; this.ed.clipMenu(c); }, 500);
       }
       return;
     }
@@ -952,13 +1024,43 @@ class Timeline {
       this.s.invalidate();
     }, 450);
   }
+  /** Guarda o estado do clipe no começo do gesto. */
+  snap(c) { this.c0 = { start: c.start, dur: c.dur, off: c.off || 0, rate: c.rate || 1 }; }
+  /** Edição do bloco de áudio: cortar as pontas, esticar (velocidade) e pinça. */
+  clipEdit(x) {
+    const c = this.selClip, o = this.c0; if (!c || !o) return;
+    const src = AudioEngine.srcMs(c.aid) ?? (o.off + o.dur * o.rate);
+    const dt = this.xToTime(x) - this.xToTime(this.downX), end0 = o.start + o.dur, MIN = 50;
+    const q = v => Math.round(v / 10) * 10;
+    if (this.mode === 'trimL') {
+      const ns = Math.max(o.start - o.off / o.rate, 0, Math.min(end0 - MIN, q(o.start + dt)));
+      c.start = ns; c.off = Math.max(0, o.off + (ns - o.start) * o.rate); c.dur = end0 - ns;
+    } else if (this.mode === 'trimR') {
+      const maxEnd = o.start + (src - o.off) / o.rate;
+      c.dur = Math.max(MIN, Math.min(maxEnd, q(end0 + dt)) - o.start);
+    } else {
+      let nd = this.mode === 'stretchR' ? o.dur + dt : this.mode === 'stretchL' ? o.dur - dt : o.dur * this.pinchScale;
+      const rate = Math.max(0.25, Math.min(4, o.rate * o.dur / Math.max(MIN, nd)));
+      nd = q(o.dur * o.rate / rate);
+      c.rate = Math.round(rate * 1000) / 1000; c.dur = nd;
+      c.start = this.mode === 'stretchL' ? Math.max(0, end0 - nd) : o.start;
+    }
+    this.s.invalidate();
+  }
   move(e) {
+    if (this.ptrs.has(e.pointerId)) this.ptrs.set(e.pointerId, this.lx(e));
     if (this.mode === 'none' || this.ed.stage.playing) return;
     const [x] = this.lx(e);
+    if (this.mode === 'pinch') {
+      if (this.ptrs.size < 2) return;
+      const [a, b] = [...this.ptrs.values()]; this.pinchScale = Math.max(10, Math.abs(a[0] - b[0])) / this.pinch0;
+      return this.clipEdit(x);
+    }
     if (Math.abs(x - this.downX) > 6) {
-      if (!this.moved) { clearTimeout(this.lp); if ((this.mode === 'multi' || this.mode === 'clip') && !this.longFired) this.ed.beforeChange(); }
+      if (!this.moved) { clearTimeout(this.lp); if ((this.mode === 'multi' || this.mode === 'clip' || /^(trim|stretch)/.test(this.mode)) && !this.longFired) this.ed.beforeChange(); }
       this.moved = true;
     }
+    if (/^(trim|stretch)/.test(this.mode)) { if (this.moved) this.clipEdit(x); this.lastX = x; return; }
     const step = 40;
     if (this.mode === 'resize') {
       const d = this.startDur + (x - this.downX) / this.perMs;
@@ -975,12 +1077,14 @@ class Timeline {
     this.lastX = x;
   }
   up(e, cancel) {
+    this.ptrs.delete(e.pointerId);
     clearTimeout(this.lp);
+    if (this.mode === 'pinch') { if (this.ptrs.size === 0) { this.mode = 'none'; this.ed.changed(); } return; }
     if (this.ed.stage.playing) { if (!cancel) this.ed.togglePlay(); return; }
     if (this.mode === 'none') return;
     if (this.longFired) { /* nada */ }
-    else if (this.mode === 'resize' || (this.mode === 'multi' && this.moved) || (this.mode === 'clip' && this.moved)) this.ed.changed();
-    else if (!this.moved && !cancel && this.mode !== 'clip') this.tap(this.lx(e)[0]);
+    else if (this.mode === 'resize' || (this.mode === 'multi' && this.moved) || ((this.mode === 'clip' || /^(trim|stretch)/.test(this.mode)) && this.moved)) this.ed.changed();
+    else if (!this.moved && !cancel && !/^(clip|trim|stretch)/.test(this.mode)) this.tap(this.lx(e)[0]);
     this.mode = 'none';
   }
   tap(x) {
@@ -1204,7 +1308,7 @@ class Builder {
 (async () => {
   await DB.open();
   await Store.loadItems();
-  await Monet.init(); Analytics.start(); Monet.refreshLicense();
+  await Monet.init(); Analytics.start(); Monet.refreshLicense(); initCloud();
   await showHome();
   const imp = new URLSearchParams(location.search).get('import'); // depuração: ?import=arquivo.atp
   if (imp) {

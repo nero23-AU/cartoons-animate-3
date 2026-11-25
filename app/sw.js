@@ -1,6 +1,6 @@
 // Service worker: guarda o app para abrir rápido e funcionar sem internet (os anúncios e a compra precisam de internet).
-const VERSION = 'ca3-web-2';
-const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'core.js', 'scene.js', 'audio.js', 'paint.js', 'tools.js', 'webads.js', 'ad.html', 'monet.js', 'app.js',
+const VERSION = 'ca3-web-4';
+const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'i18n.js', 'core.js', 'scene.js', 'audio.js', 'paint.js', 'tools.js', 'webads.js', 'ad.html', 'monet.js', 'cloud.js', 'app.js',
   'lib/jszip.min.js', 'lib/mp4-muxer.js', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

@@ -12,7 +12,7 @@ const AudioEngine = {
     if (!(await DB.get('audio', aid))) await DB.put('audio', aid, blob);
     const buf = await this.buffer(aid);
     if (!buf) throw new Error('formato de áudio não suportado');
-    return { id: uid(), aid, name: file.name.replace(/\.[^.]+$/, ''), start: Math.max(0, Math.round(startMs)), dur: Math.round(buf.duration * 1000), gain: 1 };
+    return { id: uid(), aid, name: file.name.replace(/\.[^.]+$/, ''), start: Math.max(0, Math.round(startMs)), dur: Math.round(buf.duration * 1000), off: 0, rate: 1, gain: 1 };
   },
   buffer(aid) {
     if (this.buffers.has(aid)) return Promise.resolve(this.buffers.get(aid));
@@ -40,6 +40,22 @@ const AudioEngine = {
     }
     return out;
   },
+  /** Pico no tempo t (ms) da linha do tempo, considerando corte e velocidade do clipe. */
+  clipPeak(c, t) { return this.peak(c.aid, (c.off || 0) + (t - c.start) * (c.rate || 1)); },
+  /** Duração do arquivo original (ms), ou null se ainda não carregou. */
+  srcMs(aid) { const b = this.buffers.get(aid); return b ? b.duration * 1000 : null; },
+  /** Agenda o clipe num contexto de áudio (tempo real ou exportação). */
+  schedule(ac, dest, c, buf, now, fromMs = 0, toMs = Infinity) {
+    const rate = c.rate || 1, cEnd = c.start + c.dur;
+    if (cEnd <= fromMs || c.start >= toMs) return null;
+    const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+    const g = ac.createGain(); g.gain.value = c.gain ?? 1; src.connect(g).connect(dest);
+    const a = Math.max(c.start, fromMs), b = Math.min(cEnd, toMs);
+    const offset = ((c.off || 0) + (a - c.start) * rate) / 1000, len = (b - a) * rate / 1000;
+    if (offset >= buf.duration || len <= 0) return null;
+    src.start(now + (a - fromMs) / 1000, offset, Math.min(len, buf.duration - offset));
+    return src;
+  },
   peak(aid, ms) { const p = this.peaks.get(aid); if (!p) { this.buffer(aid); return 0; } const i = Math.floor(ms / 10); return i >= 0 && i < p.length ? p[i] : 0; },
 
   /** Toca os clipes a partir de fromMs (até toMs, se informado). */
@@ -49,16 +65,8 @@ const AudioEngine = {
     const now = ac.currentTime + 0.02;
     for (const c of project.audio || []) {
       const buf = await this.buffer(c.aid); if (!buf) continue;
-      const cEnd = c.start + buf.duration * 1000;
-      if (cEnd <= fromMs || c.start >= toMs) continue;
-      const src = ac.createBufferSource(); src.buffer = buf;
-      const g = ac.createGain(); g.gain.value = c.gain ?? 1;
-      src.connect(g).connect(this.dest || ac.destination);
-      const when = now + Math.max(0, c.start - fromMs) / 1000;
-      const offset = Math.max(0, fromMs - c.start) / 1000;
-      const len = (Math.min(cEnd, toMs) - Math.max(c.start, fromMs)) / 1000;
-      src.start(when, offset, len);
-      this.playing.push(src);
+      const src = this.schedule(ac, this.dest || ac.destination, c, buf, now, fromMs, toMs);
+      if (src) this.playing.push(src);
     }
   },
   stop() { this.playing.forEach(s => { try { s.stop(); } catch (e) { /* já parou */ } }); this.playing = []; },
