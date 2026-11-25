@@ -16,9 +16,7 @@ const WebAds = {
   // ---------- Adsterra: cada bloco roda num iframe próprio (o script deles usa variável global) ----------
   adsterraFrame(key, w, hh) {
     const f = h('iframe', { cls: 'ad-frame', width: w, height: hh, scrolling: 'no', frameborder: '0', title: 'Anúncio' });
-    f.srcdoc = `<!doctype html><html><body style="margin:0;display:flex;justify-content:center;align-items:center;background:transparent">
-<script>atOptions={key:'${key}',format:'iframe',height:${hh},width:${w},params:{}};<\/script>
-<script src="https://www.highperformanceformat.com/${key}/invoke.js"><\/script></body></html>`;
+    f.src = `ad.html?k=${encodeURIComponent(key)}&w=${w}&h=${hh}`;
     return f;
   },
 

@@ -17,8 +17,8 @@ const CONFIG = {
   privacyUrl: 'https://nero23-au.github.io/cartoons-animate-3/privacidade.html',       // ex.: https://seunome.github.io/cartoons-animate-3/privacidade.html
 
   // Anúncios da versão web: '' = sem anúncios, 'adsterra' ou 'adsense' (veja SETUP.md).
-  adProvider: '',
-  adsterra: { banner320: '', banner728: '', banner300: '' },   // "keys" dos banners 320x50, 728x90 e 300x250
+  adProvider: 'adsterra',
+  adsterra: { banner320: '711aa7acdd4845cb62d748eb93e7b828', banner728: '779afd95b9988136a16c9d280f861138', banner300: '07b4ab53253cd4ee2bd9bcc255ac87dd' },   // "keys" dos banners 320x50, 728x90 e 300x250
   adsense: { client: '', bannerSlot: '' },                       // ca-pub-... e o ID do bloco de anúncio
 
   // Regras de monetização
