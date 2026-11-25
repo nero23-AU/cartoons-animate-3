@@ -5,5 +5,5 @@
 // Página de um banner Adsterra: ad.html?k=KEY&w=320&h=50 (roda no domínio do site, como o Adsterra exige)
 var q = new URLSearchParams(location.search), k = (q.get('k') || '').replace(/[^a-f0-9]/gi, ''), w = +q.get('w') || 320, hh = +q.get('h') || 50;
 window.atOptions = { key: k, format: 'iframe', height: hh, width: w, params: {} };
-var s = document.createElement('script'); s.src = 'https://www.highperformanceformat.com/' + k + '/invoke.js'; document.body.appendChild(s);
+document.write('<scr' + 'ipt src="https://www.highperformanceformat.com/' + k + '/invoke.js"></scr' + 'ipt>'); // igual ao código do Adsterra (síncrono)
 </script></body></html>
