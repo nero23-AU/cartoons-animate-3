@@ -23,6 +23,18 @@ const UI = {
   accent: '#7CC223', addBg: 'rgba(124,194,35,0.10)', audioBg: '#0F1117', audio: '#1E3A5F', audioSel: '#2F6FD6',
   ink2: '#A4A9B8', ink3: '#6B7183', thumbBg: '#181B24',
 };
+/** Celular/tela baixa: interface compacta (canvas grande, controles recolhíveis). */
+function isCompact() { return matchMedia('(max-height: 520px), (pointer: coarse) and (max-width: 1024px)').matches; }
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const p = req ? req.call(el, { navigationUI: 'hide' }) : null;
+    if (!req) toast('Tela cheia não disponível neste navegador');
+    else if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => toast('Tela cheia não disponível neste navegador'));
+  }
+}
 function tool(glyph, label, color, onclick) {
   return h('div', { cls: 'tool', style: { color }, onclick }, h('div', { cls: 'g' }, glyph), label ? h('div', { cls: 'l' }, label) : null);
 }
@@ -373,11 +385,13 @@ class Editor {
     this.panel = h('div', { cls: 'panel col scroll', style: { display: 'none' } });
     this.saveLabel = h('div', { cls: 'save-label' });
     // botão grande para voltar ao menu do app
-    const exitBtn = h('button', { cls: 'exit-btn', title: T('Sair para o menu'), onclick: () => this.exit() }, '✖ ', 'SAIR');
+    const exitBtn = h('button', { cls: 'exit-btn', title: T('Sair para o menu'), onclick: () => this.exit() }, '✖', h('span', { cls: 'lbl' }, 'SAIR'));
+    // tela cheia (esconde as barras do navegador/sistema no celular)
+    const fsBtn = h('button', { cls: 'fs-btn', title: T('Tela cheia'), onclick: () => toggleFullscreen() }, '⛶');
     // câmera: liga o modo de enquadrar (quadro azul que move e dá zoom)
     this.camBtn = h('button', { cls: 'cam-btn', title: T('Câmera: enquadramento'), onclick: () => this.toggleCamera() }, '🎥');
     this.camResetBtn = h('button', { cls: 'cam-reset', style: { display: 'none' }, onclick: () => this.resetCamera() }, '⟲ ', 'Palco inteiro');
-    const stageWrap = h('div', { cls: 'stage-wrap' }, this.stage.s.el, this.saveLabel, exitBtn, this.camBtn, this.camResetBtn);
+    const stageWrap = h('div', { cls: 'stage-wrap' }, this.stage.s.el, this.saveLabel, fsBtn, exitBtn, this.camBtn, this.camResetBtn);
     this.stage.s.el.style.flex = '1';
     const tl = this.timeline;
     this.cutBtn = h('button', { cls: 'tl-btn', title: T('Tesoura: toque no áudio onde quer cortar'), onclick: () => {
@@ -387,9 +401,24 @@ class Editor {
     // barra de rolagem: arrasta do começo ao fim da timeline (quadros e áudio)
     this.tlScroll = h('input', { type: 'range', cls: 'tl-scroll', min: 0, max: 0, step: 1, value: 0, oninput: e => { tl.scroll = +e.target.value; tl.clamp(); tl.s.invalidate(); } });
     tl.onDraw = () => { const max = Math.max(0, Math.round(tl.contentWidth() - tl.s.w)); this.tlScroll.max = max; this.tlScroll.value = Math.round(tl.scroll); this.tlScroll.disabled = !max; };
-    const tlBar = h('div', { cls: 'tl-bar' }, this.cutBtn, this.tlScroll);
+    // celular: timeline retrátil e faixa de áudio mostrada só quando pedida
+    const compact = isCompact();
+    tl.frameH = compact ? 46 : 64; tl.compact = compact;
+    this.tlOpen = this.tlOpen ?? true;
+    this.showAudio = this.showAudio ?? (!compact || !!(this.project.audio || []).length);
+    const tlSize = () => {
+      const el = tl.s.el; el.style.display = this.tlOpen ? '' : 'none';
+      el.style.height = (tl.frameH + (this.showAudio ? (compact ? 34 : 52) : 4)) + 'px';
+      this.tlToggle.textContent = this.tlOpen ? '▾' : '▴';
+      this.audBtn.classList.toggle('on', this.showAudio); this.audBtn.style.display = this.tlOpen ? '' : 'none';
+      this.cutBtn.style.display = this.tlOpen && this.showAudio ? '' : 'none';
+      requestAnimationFrame(() => { if (this.stage.fit) this.stage.fit(); Surface.all.forEach(s => s.invalidate()); });
+    };
+    this.tlToggle = h('button', { cls: 'tl-btn', title: T('Mostrar/ocultar timeline'), onclick: () => { this.tlOpen = !this.tlOpen; tlSize(); } });
+    this.audBtn = h('button', { cls: 'tl-btn', title: T('Mostrar/ocultar áudio'), onclick: () => { this.showAudio = !this.showAudio; tlSize(); } }, '🎵');
+    const tlBar = h('div', { cls: 'tl-bar' }, this.tlToggle, this.audBtn, this.cutBtn, this.tlScroll);
     const right = h('div', { cls: 'col', style: { flex: '1', minWidth: '0' } }, stageWrap, this.timeline.s.el, tlBar);
-    this.timeline.s.el.style.height = '116px'; this.timeline.s.el.style.flex = 'none'; this.timeline.s.el.classList.add('timeline-wrap');
+    this.timeline.s.el.style.flex = 'none'; this.timeline.s.el.classList.add('timeline-wrap'); tlSize();
     $app().replaceChildren(bar, this.panel, right);
     this.updateUndoButtons();
   }
@@ -1159,7 +1188,7 @@ class Timeline {
   draw(ctx, w, hh) {
     if (this.onDraw) this.onDraw();
     ctx.fillStyle = UI.trackBg; ctx.fillRect(0, 0, w, hh);
-    const fr = this.fr, top = 14, bot = this.frameH - 4;
+    const fr = this.fr, top = this.compact ? 12 : 14, bot = this.frameH - 4;
     for (const i of [...this.multi]) if (i >= fr.length) this.multi.delete(i);
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     let x = this.gap - this.scroll;
@@ -1170,8 +1199,8 @@ class Timeline {
         ctx.fillStyle = i === this.playFrame ? UI.play : marked ? UI.marked : sel ? UI.select : UI.cell;
         rrect(ctx, x, top, cw, bot - top, 8); ctx.fill();
         ctx.strokeStyle = sel || marked || i === this.playFrame ? 'rgba(255,255,255,0.25)' : UI.cellLine; ctx.lineWidth = 1; rrect(ctx, x + 0.5, top + 0.5, cw - 1, bot - top - 1, 8); ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = `700 14px ${UI.font}`; ctx.fillText(String(i + 1), x + cw / 2, top + 19);
-        ctx.fillStyle = sel || marked ? 'rgba(255,255,255,0.85)' : UI.ink2; ctx.font = `500 11px ${UI.font}`; ctx.fillText((f.d / 1000).toFixed(2).replace('.', ',') + 's', x + cw / 2, bot - 8);
+        ctx.fillStyle = '#fff'; ctx.font = `700 14px ${UI.font}`; ctx.fillText(String(i + 1), x + cw / 2, this.compact && !sel ? (top + bot) / 2 + 5 : top + 17);
+        ctx.fillStyle = sel || marked ? 'rgba(255,255,255,0.85)' : UI.ink2; ctx.font = `500 ${this.compact ? 10 : 11}px ${UI.font}`; if (!this.compact || sel) ctx.fillText((f.d / 1000).toFixed(2).replace('.', ',') + 's', x + cw / 2, bot - (this.compact ? 5 : 8));
         ctx.fillStyle = '#fff';
         if (sel && !this.ed.stage.playing) { rrect(ctx, x + cw - 7, top + 10, 4, bot - top - 20, 2); ctx.fill(); }
         if (f.fx && f.fx.mb && i < fr.length - 1) { // marcador de transição (motion blur), como no editor de vídeo
@@ -1186,6 +1215,7 @@ class Timeline {
     ctx.fillStyle = UI.accent; ctx.font = `300 26px ${UI.font}`; ctx.fillText('+', x + this.base / 2, (top + bot) / 2 + 9);
     // faixa de áudio
     const at = this.frameH, ab = hh - 4, mid = (at + ab) / 2;
+    if (ab - at > 10) {
     ctx.fillStyle = UI.audioBg; ctx.fillRect(0, at, w, ab - at);
     ctx.fillStyle = UI.cellLine; ctx.fillRect(0, at, w, 1);
     const audio = this.ed.project.audio || [];
@@ -1208,6 +1238,7 @@ class Timeline {
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.font = `600 11px ${UI.font}`;
       const rt = (c.rate || 1) !== 1 ? '  ' + T('(velocidade ' + Math.round(c.rate * 100) + '%)') : '';
       ctx.fillText((str ? '↔ ' : '') + c.name + rt, Math.max(x0 + 8, 4), at + 13);
+    }
     }
     // cursor de reprodução atravessando quadros e áudio
     if (this.playT >= 0) { const px = this.timeToX(this.playT); ctx.fillStyle = '#FF5252'; ctx.fillRect(px - 1, 0, 2, hh); }

@@ -210,6 +210,27 @@ body.has-banner.banner-wide #app { height: calc(100% - 90px); }
 .cam-btn.on { background: var(--select); border-color: var(--select); box-shadow: 0 0 0 3px color-mix(in srgb, var(--select) 35%, transparent); }
 @media (max-height: 480px) { .exit-btn { height: 38px; padding: 0 14px; font-size: 14px; } .save-label { right: 120px; top: 14px; } .cam-btn { width: 40px; height: 40px; font-size: 18px; } }
 
+/* tela cheia */
+.fs-btn { position: absolute; right: 122px; top: 10px; z-index: 3; width: 46px; height: 46px; border-radius: var(--r-md); border: 1px solid var(--line-strong); background: rgba(31, 35, 48, .8); color: var(--ink); font-size: 20px; cursor: pointer; }
+.save-label { right: 180px; }
+/* ===== celular / tela baixa: canvas grande, controles compactos e flutuantes ===== */
+@media (max-height: 520px), (pointer: coarse) and (max-width: 1024px) {
+  .bar { width: 54px; padding: 4px 3px; }
+  .bar .tool { padding: 4px 0; }
+  .bar .tool .l { display: none; }
+  .bar .tool .g { width: 36px; height: 36px; font-size: 18px; }
+  .bar-sep { margin: 3px 8px; }
+  .exit-btn { right: 8px; top: 8px; width: 40px; height: 40px; padding: 0; justify-content: center; font-size: 16px; border-radius: 12px; box-shadow: none; opacity: .9; }
+  .exit-btn .lbl { display: none; }
+  .fs-btn { right: 54px; top: 8px; width: 40px; height: 40px; font-size: 17px; border-radius: 12px; opacity: .8; }
+  .save-label { right: 102px; top: 23px; width: 10px; height: 10px; padding: 0; font-size: 0; border: 0; background: var(--accent); opacity: .8; }
+  .cam-btn { left: 8px; bottom: 8px; width: 40px; height: 40px; font-size: 18px; opacity: .75; background: rgba(31, 35, 48, .7); }
+  .cam-btn.on { opacity: 1; }
+  .cam-reset { left: 56px; bottom: 10px; height: 34px; }
+  .col > .tl-bar { padding: 2px 6px; gap: 6px; }
+  .tl-bar .tl-btn { width: 32px; height: 24px; font-size: 13px; }
+  .tl-bar .tl-scroll { height: 18px; }
+}
 /* timeline: tesoura e barra de rolagem */
 .tl-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--surface); border-top: 1px solid var(--line); flex: none; }
 .tl-btn { width: 38px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--ink); font-size: 16px; cursor: pointer; flex: none; }
