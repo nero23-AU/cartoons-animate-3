@@ -11,6 +11,17 @@ const installId = (() => { let id = LS.get('install'); if (!id) { id = uid(); LS
 const NativeAds = () => window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? window.Capacitor.Plugins.Ads : null;
 
 
+// monitoramento: erros do app aparecem no painel do dono
+(() => {
+  let n = 0;
+  const report = (msg, src) => {
+    if (n++ >= 5 || typeof Analytics === 'undefined') return;
+    Analytics.track('js_error', { error: String(msg || '').slice(0, 160), src: String(src || '').split('/').pop().slice(0, 60) });
+  };
+  window.addEventListener('error', e => report(e.message, e.filename + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', e => report(e.reason && (e.reason.message || e.reason), 'promise'));
+})();
+
 const Monet = {
   noAdsBuild: false,
   /** No Android: descobre se o APK tem as chaves de anúncio configuradas. */

@@ -16,6 +16,9 @@ const WebAds = {
   // ---------- Adsterra: cada bloco roda num iframe próprio (o script deles usa variável global) ----------
   adsterraFrame(key, w, hh) {
     const f = h('iframe', { cls: 'ad-frame', width: w, height: hh, scrolling: 'no', frameborder: '0', title: 'Anúncio' });
+    // sandbox sem allow-same-origin: o script do anunciante não lê o armazenamento do app (sessão, projetos)
+    f.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation');
+    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     f.src = `ad.html?k=${encodeURIComponent(key)}&w=${w}&h=${hh}`;
     return f;
   },

@@ -2,6 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: data:; connect-src 'self' https://xpvfjphipzzdinazycsy.supabase.co blob: data:; frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Cartoons Animate 3</title>
 <link rel="stylesheet" href="style.css">
@@ -29,7 +31,6 @@
 <script src="cloud.js"></script>
 <script src="app.js"></script>
 <div id="rotate"><div style="font-size:54px">📱↻</div><div data-i18n>Gire o celular para a horizontal</div><button id="fs-btn" data-i18n>Tela cheia na horizontal</button></div>
-<script>I18N.page(); document.getElementById('fs-btn').onclick = async () => { try { await document.documentElement.requestFullscreen(); await screen.orientation.lock('landscape'); } catch (e) {} };</script>
-<script>if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js');</script>
+<script src="boot.js"></script>
 </body>
 </html>

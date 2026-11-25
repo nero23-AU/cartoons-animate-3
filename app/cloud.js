@@ -7,9 +7,14 @@ const Auth = {
   session: null, // { access_token, refresh_token, expires_at (s), user: { id, email } }
   base() { return CONFIG.supabaseUrl + '/auth/v1'; },
   enabled() { return !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); },
-  load() { try { this.session = JSON.parse(localStorage.getItem(this.KEY)); } catch (e) { this.session = null; } },
+  MAX_AGE: 30 * 864e5, // depois de 30 dias a pessoa precisa entrar de novo
+  load() {
+    try { this.session = JSON.parse(localStorage.getItem(this.KEY)); } catch (e) { this.session = null; }
+    if (this.session && !(Date.now() - (this.session.login_at || 0) < this.MAX_AGE)) this.store(null);
+  },
   store(s) {
-    this.session = s ? { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), user: { id: s.user.id, email: s.user.email } } : null;
+    const login_at = (this.session && this.session.user && s && s.user && this.session.user.id === s.user.id && this.session.login_at) || Date.now();
+    this.session = s ? { login_at, access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), user: { id: s.user.id, email: s.user.email } } : null;
     try { s ? localStorage.setItem(this.KEY, JSON.stringify(this.session)) : localStorage.removeItem(this.KEY); } catch (e) { }
   },
   user() { return this.session && this.session.user; },
