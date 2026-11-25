@@ -253,3 +253,12 @@ body.has-banner.banner-wide #app { height: calc(100% - 90px); }
 .tut-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); cursor: pointer; }
 .tut-dots span.on { background: var(--select); width: 20px; border-radius: 4px; }
 @media (max-height: 480px) { .tut-art { height: 90px; } .tut-art.emoji { font-size: 44px; } .tut-body { min-height: 0; font-size: 13px; } }
+
+/* marca Vinsk Apps na tela inicial */
+.home-main { position: relative; }
+.brand-wm { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); width: min(60%, 640px); opacity: .08; pointer-events: none; z-index: 0; }
+.home-main > .scroll { position: relative; z-index: 1; padding-bottom: 56px; }
+.brand-corner { position: absolute; left: 14px; bottom: 10px; z-index: 2; display: block; padding: 6px 10px; border-radius: var(--r-md); background: rgba(15, 17, 23, .75); border: 1px solid var(--line); backdrop-filter: blur(6px); opacity: .9; }
+.brand-corner:hover { opacity: 1; }
+.brand-corner img { display: block; height: 30px; width: auto; }
+@media (max-height: 480px) { .brand-corner img { height: 22px; } .brand-corner { left: 8px; bottom: 6px; padding: 4px 8px; } }

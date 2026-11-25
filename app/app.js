@@ -186,7 +186,10 @@ async function showHome() {
       h('div', { cls: 'home-head' }, h('h1', {}, 'Minhas animações'),
         Monet.slots() === Infinity ? null : h('span', { cls: 'slots' }, `${projects.length} de ${Monet.slots()} espaços usados`),
         h('div', { cls: 'sp' }), I18N.picker()),
-      h('div', { cls: 'scroll', style: { flex: 1 } }, grid)),
+      h('div', { cls: 'scroll', style: { flex: 1 } }, grid),
+      // marca Vinsk Apps: marca d'água ao fundo e logo no canto inferior esquerdo (leva ao site)
+      h('img', { cls: 'brand-wm', src: 'logo-light.png', alt: '' }),
+      h('a', { cls: 'brand-corner', href: '../', target: '_blank', rel: 'noopener', title: 'Vinsk Apps' }, h('img', { src: 'logo-light.png', alt: 'Vinsk Apps' }))),
     h('div', { cls: 'col scroll side-nav' },
       big('🎬', 'NOVO\nCARTOON', 'var(--accent)', async () => {
         if (projects.length >= Monet.slots()) { Analytics.track('slot_limit_hit', { used: projects.length }); if (!(await Monet.addSlot())) return; }
