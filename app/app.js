@@ -39,6 +39,29 @@ function tool(glyph, label, color, onclick) {
   return h('div', { cls: 'tool', style: { color }, onclick }, h('div', { cls: 'g' }, glyph), label ? h('div', { cls: 'l' }, label) : null);
 }
 function toast(msg, ms = 2400) { const t = h('div', { cls: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), ms); }
+// ---------- instalar o app (PWA) no celular ou computador ----------
+const Install = {
+  evt: null,
+  installed() { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; },
+  async run() {
+    if (this.evt) {
+      this.evt.prompt(); const r = await this.evt.userChoice.catch(() => null); this.evt = null;
+      Analytics.track('install_' + (r && r.outcome || 'unknown'));
+      if (r && r.outcome === 'accepted') { toast('App instalado ✓'); showHome(); }
+      return;
+    }
+    const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Mac/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+    const steps = ios ? ['No Safari, toque no botão Compartilhar (quadrado com seta ⬆)', 'Escolha "Adicionar à Tela de Início"', 'Toque em "Adicionar": o ícone aparece junto dos seus apps']
+      : android ? ['Toque no menu ⋮ do navegador (canto superior direito)', 'Escolha "Instalar app" ou "Adicionar à tela inicial"', 'Confirme: o ícone aparece junto dos seus apps']
+      : ['No Chrome ou Edge, clique no ícone de instalar (⊕) na barra de endereço', 'Ou abra o menu ⋮ → "Instalar Cartoons Animate 3"', 'O app abre em janela própria, como um programa'];
+    Analytics.track('install_help');
+    modal('Instalar o app', h('div', {}, h('p', { style: { margin: '0 0 10px', color: 'var(--ink-2)' } }, 'Abre direto da tela inicial, em tela cheia e funciona sem internet.'),
+      h('ol', { style: { paddingLeft: '20px', lineHeight: '1.7', margin: 0 } }, steps.map(s => h('li', {}, s)))));
+  },
+};
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); Install.evt = e; });
+window.addEventListener('appinstalled', () => { Install.evt = null; Analytics.track('app_installed'); });
+
 function modal(title, body, buttons = [['OK', null]]) {
   const bg = h('div', { cls: 'modal-bg' });
   const close = () => bg.remove();
@@ -170,6 +193,7 @@ async function showHome() {
         const p = newProject(); p.name = 'Animação ' + (projects.length + 1); Analytics.track('project_new'); new Editor(p);
       }, true),
       big('🧩', 'CONSTRUTOR\nDE ITENS', 'var(--cyan)', () => showItems()),
+      Install.installed() ? null : big('📲', 'INSTALAR\nAPP', 'var(--accent)', () => Install.run()),
       big('📖', 'TUTORIAL', 'var(--teal)', () => showTutorial()),
       big('💾', 'BACKUP', 'var(--play)', () => showBackup()),
       big('🧹', 'ARMAZE-\nNAMENTO', 'var(--ink-3)', () => showStorage()),
