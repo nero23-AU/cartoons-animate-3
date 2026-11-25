@@ -531,9 +531,9 @@ th: {
 };
 // termos curtos extras
 Object.entries({
-  en: { 'Nova senha': 'New password', 'Senha alterada ✓': 'Password changed ✓', 'Projetos': 'Projects', 'Itens': 'Items', 'Imagens': 'Images', 'Áudios': 'Audio', 'Armazenamento': 'Storage', 'Backup': 'Backup' },
-  ru: { 'Nova senha': 'Новый пароль', 'Senha alterada ✓': 'Пароль изменён ✓', 'Projetos': 'Проекты', 'Itens': 'Предметы', 'Imagens': 'Изображения', 'Áudios': 'Аудио', 'Armazenamento': 'Память', 'Backup': 'Резервная копия' },
-  es: { 'Nova senha': 'Nueva contraseña', 'Senha alterada ✓': 'Contraseña cambiada ✓', 'Projetos': 'Proyectos', 'Itens': 'Objetos', 'Imagens': 'Imágenes', 'Áudios': 'Audios', 'Armazenamento': 'Almacenamiento', 'Backup': 'Copia de seguridad' },
-  th: { 'Nova senha': 'รหัสผ่านใหม่', 'Senha alterada ✓': 'เปลี่ยนรหัสผ่านแล้ว ✓', 'Projetos': 'โปรเจกต์', 'Itens': 'ไอเท็ม', 'Imagens': 'รูป', 'Áudios': 'เสียง', 'Armazenamento': 'พื้นที่จัดเก็บ', 'Backup': 'สำรองข้อมูล' },
+  en: { 'Sem itens ainda': 'Nothing here yet', 'Opções': 'Options', 'Nova senha': 'New password', 'Senha alterada ✓': 'Password changed ✓', 'Projetos': 'Projects', 'Itens': 'Items', 'Imagens': 'Images', 'Áudios': 'Audio', 'Armazenamento': 'Storage', 'Backup': 'Backup' },
+  ru: { 'Sem itens ainda': 'Пока пусто', 'Opções': 'Параметры', 'Nova senha': 'Новый пароль', 'Senha alterada ✓': 'Пароль изменён ✓', 'Projetos': 'Проекты', 'Itens': 'Предметы', 'Imagens': 'Изображения', 'Áudios': 'Аудио', 'Armazenamento': 'Память', 'Backup': 'Резервная копия' },
+  es: { 'Sem itens ainda': 'Sin objetos aún', 'Opções': 'Opciones', 'Nova senha': 'Nueva contraseña', 'Senha alterada ✓': 'Contraseña cambiada ✓', 'Projetos': 'Proyectos', 'Itens': 'Objetos', 'Imagens': 'Imágenes', 'Áudios': 'Audios', 'Armazenamento': 'Almacenamiento', 'Backup': 'Copia de seguridad' },
+  th: { 'Sem itens ainda': 'ยังไม่มีไอเท็ม', 'Opções': 'ตัวเลือก', 'Nova senha': 'รหัสผ่านใหม่', 'Senha alterada ✓': 'เปลี่ยนรหัสผ่านแล้ว ✓', 'Projetos': 'โปรเจกต์', 'Itens': 'ไอเท็ม', 'Imagens': 'รูป', 'Áudios': 'เสียง', 'Armazenamento': 'พื้นที่จัดเก็บ', 'Backup': 'สำรองข้อมูล' },
 }).forEach(([l, d]) => Object.assign(I18N_DICT[l], d));
 I18N.init();
