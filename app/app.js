@@ -789,7 +789,7 @@ class Stage {
   toStage(e) { const r = this.s.el.getBoundingClientRect(); return [(e.clientX - r.left - this.offX) / this.sc, (e.clientY - r.top - this.offY) / this.sc]; }
   local(e) { const r = this.s.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   down(e) {
-    this.s.el.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, this.lx(e));
+    this.s.el.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, this.local(e));
     if (this.playing) return;
     if (this.pointers.size === 2) { if (this.mode !== 'none' && this.mode !== 'pan') this.ed.changed(); this.startPinch(); return; }
@@ -1010,7 +1010,7 @@ class Timeline {
   lx(e) { const r = this.s.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   clipAt(x) { for (const c of [...(this.ed.project.audio || [])].reverse()) if (x >= this.timeToX(c.start) && x <= this.timeToX(c.start + c.dur)) return c; return null; }
   down(e) {
-    this.s.el.setPointerCapture(e.pointerId);
+    this.s.el.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, this.lx(e));
     if (this.ed.stage.playing) return;
     const [x, y] = this.lx(e);
     this.downX = x; this.lastX = x; this.moved = false; this.longFired = false; this.mode = 'scroll';
