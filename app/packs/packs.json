@@ -2,13 +2,34 @@
   "version": 1,
   "packs": [
     {
-      "file": "Monstros Vinsk v3.atp",
-      "folder": "Monstros Vinsk",
-      "replace": true
+      "file": "Basico Vinsk.atp",
+      "folder": "Básico Vinsk"
     },
     {
       "file": "jasonxmichael.pack.atp",
       "folder": "Jason x Michael"
+    }
+  ],
+  "remove": [
+    {
+      "id": "monstros-vinsk",
+      "folder": "Monstros Vinsk",
+      "names": [
+        "Caçadora",
+        "Cavaleiro Esqueleto",
+        "Palhaço Caveira",
+        "Boneca de Porcelana",
+        "Carrasco",
+        "Bruxo da Cartola",
+        "Lobisomem",
+        "Criatura Pálida",
+        "Esqueleto Colossal",
+        "Demônio Motosserra",
+        "Espada Enferrujada",
+        "Machado de Carrasco",
+        "Escudo de Madeira",
+        "Motosserra"
+      ]
     }
   ]
 }

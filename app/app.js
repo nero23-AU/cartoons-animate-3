@@ -858,8 +858,15 @@ const DefaultPacks = {
   async install() {
     let man; try { man = await (await fetch('packs/packs.json', { cache: 'no-cache' })).json(); } catch (e) { return; }
     const done = new Set(LS.get('packsDone', []));
+    // packs retirados: apaga da biblioteca só os itens listados, na pasta do pack (projetos salvos guardam cópia própria)
+    let removed = false;
+    for (const rm of man.remove || []) {
+      const key = 'rm:' + rm.id; if (done.has(key)) continue;
+      for (const r of Store.items.filter(x => x.folder === rm.folder && (rm.names || []).includes(x.t.name))) await Store.deleteItem(r.t.name);
+      done.add(key); LS.set('packsDone', [...done]); removed = true;
+    }
     const todo = (man.packs || []).filter(p => !done.has(p.file) && /^[\w.\- ]+\.(atp|ati)$/i.test(p.file));
-    if (!todo.length) return;
+    if (!todo.length) { if (removed) await Store.loadItems(); return; }
     for (const p of todo) {
       try {
         const blob = await (await fetch('packs/' + encodeURIComponent(p.file))).blob();
