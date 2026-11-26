@@ -864,7 +864,8 @@ const DefaultPacks = {
       try {
         const blob = await (await fetch('packs/' + encodeURIComponent(p.file))).blob();
         const r = await Importer.importBuffer(await blob.arrayBuffer(), p.file);
-        for (const t of r.items) if (!Store.items.some(x => x.t.name === t.name)) await Store.saveItem(t, null, { folder: p.folder || p.file, tags: [] });
+        // replace: true substitui itens de mesmo nome (versão nova de um pack que já foi instalado)
+        for (const t of r.items) if (p.replace || !Store.items.some(x => x.t.name === t.name)) await Store.saveItem(t, null, { folder: p.folder || p.file, tags: [] });
         done.add(p.file); LS.set('packsDone', [...done]);
       } catch (e) { console.warn('pack padrão', p.file, e.message); }
     }

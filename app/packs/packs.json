@@ -2,8 +2,9 @@
   "version": 1,
   "packs": [
     {
-      "file": "Monstros Vinsk.atp",
-      "folder": "Monstros Vinsk"
+      "file": "Monstros Vinsk v2.atp",
+      "folder": "Monstros Vinsk",
+      "replace": true
     },
     {
       "file": "jasonxmichael.pack.atp",
