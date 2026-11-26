@@ -198,6 +198,7 @@ async function showHome() {
       big('🧩', 'CONSTRUTOR\nDE ITENS', 'var(--cyan)', () => showItems()),
       Install.installed() ? null : big('📲', 'INSTALAR\nAPP', 'var(--accent)', () => Install.run()),
       big('📖', 'TUTORIAL', 'var(--teal)', () => showTutorial()),
+      CONFIG.telegramUrl ? big(h('img', { src: 'telegram.svg', alt: '', style: { width: '1em', height: '1em' } }), 'GRUPO\nTELEGRAM', '#29A9EB', () => { Analytics.track('telegram_open'); window.open(CONFIG.telegramUrl, '_blank', 'noopener'); }) : null,
       big('💾', 'BACKUP', 'var(--play)', () => showBackup()),
       big('🧹', 'ARMAZE-\nNAMENTO', 'var(--ink-3)', () => showStorage()),
       Auth.enabled() ? big(Auth.user() ? '☁' : '👤', 'CONTA', 'var(--select)', () => showAccount()) : null,

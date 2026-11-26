@@ -14,6 +14,7 @@ const CONFIG = {
   removeAdsPrice: 'US$ 4,99',
 
   // Página de política de privacidade (obrigatória para anúncios). Fica na landing page.
+  telegramUrl: 'https://t.me/+FSHwICAIk741MDMx',   // grupo do app no Telegram (menu inicial e landing)
   privacyUrl: 'https://vinskapps.online/privacidade.html',       // ex.: https://seunome.github.io/cartoons-animate-3/privacidade.html
 
   // Anúncios da versão web: '' = sem anúncios, 'adsterra' ou 'adsense' (veja SETUP.md).
